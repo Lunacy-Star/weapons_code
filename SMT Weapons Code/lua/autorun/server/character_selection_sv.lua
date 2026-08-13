@@ -17,6 +17,22 @@ function ApplyCharacterToPlayer(ply, charID, modelPath)
         return false
     end
 
+    -- Switching characters is about to wipe every weapon this player holds,
+    -- including any demon-granted move set. Drop demon possession and the
+    -- active-demon selection first so nothing stale carries into the new character.
+    if DEMONCOMP and DEMONCOMP.ResetPlayerDemonState then
+        DEMONCOMP.ResetPlayerDemonState(ply)
+    end
+
+    -- Anything the player owns beyond their (about to be replaced) character's
+    -- freebie loadout is moved to personal storage before it gets wiped below,
+    -- so switching characters never destroys earned gear. Must run before
+    -- AssignedCharacter is overwritten, since it reads the OLD character's
+    -- base-weapon list to know what counts as "extra".
+    if LOADOUTPERSIST and LOADOUTPERSIST.StashExtras then
+        LOADOUTPERSIST.StashExtras(ply)
+    end
+
     local character = CHARACTERS.List[charID]
 
     -- Resolve model
@@ -124,7 +140,7 @@ hook.Add(
 
                 local charID = ply:GetNWString("AssignedCharacter", "")
 
-                if charID == "" then
+                if charID == "" and not (LOADOUTPERSIST and LOADOUTPERSIST.HasSavedData(ply)) then
                     local defaultChar = TBC_DEFAULT_CHARACTER or "citizen"
 
                     if CHARACTERS and CHARACTERS.List and CHARACTERS.List[defaultChar] then

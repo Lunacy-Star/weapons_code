@@ -88,6 +88,12 @@ function RollAoETargets(ply, target, weapon, tech)
         if CheckIfValidTBCEntity(player) then
             local currentHP = player:GetNWInt("TBCHP", 100)
             if currentHP > 0 then
+                -- `target` already got its hit effect from TargetCheckValidity;
+                -- this covers the rest of the AoE's side, hit or miss alike.
+                if player ~= target and SMTParticles then
+                    SMTParticles.TriggerForWeapon(weapon, player)
+                end
+
                 if weapon:AbilityRollNumber(tech, player) then
                     table.insert(playersInFight, player)
                 end
@@ -120,8 +126,12 @@ function PlayerCheckFight(ply)
         local currentTurnPlayer = fight[currentActiveSide][fight.ActiveMember]
 
         if currentTurnPlayer ~= ply then
-            ply:ChatPrint("It's not your turn yet.")
-            return false
+            -- A master acting through their demon companion may act on the demon's turn
+            local controlledDemon = ply.TBCControlledDemon
+            if not (IsValid(controlledDemon) and currentTurnPlayer == controlledDemon) then
+                ply:ChatPrint("It's not your turn yet.")
+                return false
+            end
         end
 
         local weapon = ply:GetActiveWeapon()
@@ -144,6 +154,25 @@ function TargetCheckValidity(ply, target, hpValidation)
         return false
     end
 
+    -- Demon companions carry their FightId directly instead of on an engage swep
+    if target.isTBCDemon then
+        if target.FightId ~= engageWeaponPly.FightId then
+            ply:ChatPrint("Target is not in your fight.")
+            return false
+        end
+
+        if hpValidation and target:GetNWInt("TBCHP", 100) <= 0 then
+            ply:ChatPrint("You can't target this individual. They are dead.")
+            return false
+        end
+
+        if SMTParticles then
+            SMTParticles.TriggerForWeapon(ply:GetActiveWeapon(), target)
+        end
+
+        return true
+    end
+
     local engageWeapon = target:GetWeapon("smti_engageswep")
     if not IsValid(engageWeapon) then
         ply:ChatPrint("Target does not have an engage swep.")
@@ -162,6 +191,10 @@ function TargetCheckValidity(ply, target, hpValidation)
             ply:ChatPrint(message)
             return false
         end
+    end
+
+    if SMTParticles then
+        SMTParticles.TriggerForWeapon(ply:GetActiveWeapon(), target)
     end
 
     return true
@@ -192,9 +225,30 @@ function HealCheckValidity(ply, target)
         local currentTurnPlayer = fight[currentActiveSide][fight.ActiveMember]
 
         if currentTurnPlayer ~= ply then
-            ply:ChatPrint("It's not your turn yet.")
+            -- A master acting through their demon companion may act on the demon's turn
+            local controlledDemon = ply.TBCControlledDemon
+            if not (IsValid(controlledDemon) and currentTurnPlayer == controlledDemon) then
+                ply:ChatPrint("It's not your turn yet.")
+                return false
+            end
+        end
+    end
+
+    -- Demon companions carry their FightId directly instead of on an engage swep
+    if target.isTBCDemon then
+        if target.FightId ~= engageWeaponPly.FightId then
+            ply:ChatPrint("Target is not in your fight.")
             return false
         end
+
+        resultsArray["inAFight"] = inAFight
+        resultsArray["validated"] = true
+
+        if SMTParticles then
+            SMTParticles.TriggerForWeapon(ply:GetActiveWeapon(), target)
+        end
+
+        return resultsArray
     end
 
     local engageWeapon = target:GetWeapon("smti_engageswep")
@@ -210,6 +264,10 @@ function HealCheckValidity(ply, target)
 
     resultsArray["inAFight"] = inAFight
     resultsArray["validated"] = true
+
+    if SMTParticles then
+        SMTParticles.TriggerForWeapon(ply:GetActiveWeapon(), target)
+    end
 
     return resultsArray
 end

@@ -264,6 +264,26 @@ local function FindFreeSlot(bucket)
     return nil
 end
 
+-- ---------------------------------------------------------------
+--  Minimal public API so other addons (e.g. Loadout Persistence) can
+--  place/remove items in a player's personal storage bucket without
+--  duplicating this file's save format or save file.
+-- ---------------------------------------------------------------
+STORAGE = STORAGE or {}
+
+function STORAGE.EnsurePlayerBucket(steamID)
+    EnsurePlayerStorage(steamID)
+    return StoragePlayerData[steamID].player
+end
+
+function STORAGE.FindFreeSlot(bucket)
+    return FindFreeSlot(bucket)
+end
+
+function STORAGE.Save()
+    SaveStorageData()
+end
+
 local function CanStoreWeapon(ply, weapon)
     if not IsValid(weapon) then return false end
     if weapon.PersonaSkill then return false end

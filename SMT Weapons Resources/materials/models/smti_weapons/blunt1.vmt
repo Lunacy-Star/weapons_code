@@ -1,0 +1,26 @@
+VertexLitGeneric
+{
+	$basetexture "models/smti_weapons/blunt1"
+                $color2 "[1 1 1]"
+	$surfaceprop Flesh
+	$normalmapalphaenvmapmask "1"
+
+	$lightwarptexture "models/smti_weapons/toon_gen"
+
+                $halflambert 1
+
+	$phong 1
+	$phongfresnelranges "[0.2 0.2 0.24]"
+	$phongtint "[1 1 1]"
+	$phongalbedotint 1
+	$phongexponent 0.1
+	$phongboost 0.1
+	$phongalbedoboost 4
+
+	$rimlight 0
+	$rimlightexponent 5
+	$rimlightboost 1
+	$rimlightmask 1
+
+	$rimmask 1
+}

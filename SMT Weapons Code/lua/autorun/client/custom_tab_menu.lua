@@ -1,554 +1,47 @@
-if SERVER then
-    game.AddAmmoType({name = "items"})
-
-    util.AddNetworkString("RequestInventoryData")
-    util.AddNetworkString("OpenInventory")
-    util.AddNetworkString("UpdateInventory")
-    util.AddNetworkString("DropWeapon")
-    util.AddNetworkString("DropItems")
-    util.AddNetworkString("EquipPersona")
-    util.AddNetworkString("DropPersona")
-
-    function TBC_PlaceEntity(ent, tr, ply)
-        if not IsValid(ent) then
-            return
-        end
-
-        local pos = tr.HitPos + tr.HitNormal * 5
-        ent:SetPos(pos)
-        ent:SetAngles(Angle(0, ply:EyeAngles().y + 180, 0))
-
-        local phys = ent:GetPhysicsObject()
-        if IsValid(phys) then
-            phys:EnableMotion(true)
-            phys:Wake()
-        end
-
-        ent:SetNWString("PrintName", ent.PrintName or "Unknown")
-        ent:Activate()
-    end
-
-    local function TBC_CreateDroppedWeapon(ply, weapon, amountToDrop)
-        if not IsValid(ply) or not IsValid(weapon) then
-            return
-        end
-
-        local weaponClass = weapon:GetClass()
-        local primAmmo = amountToDrop
-
-        local model = weapon:GetModel()
-        if model == "models/weapons/v_physcannon.mdl" then
-            model = "models/weapons/w_physics.mdl"
-        end
-        if not util.IsValidModel(model) then
-            model = "models/weapons/w_rif_ak47.mdl"
-        end
-
-        local ent = ents.Create("prop_physics")
-        if not IsValid(ent) then
-            return
-        end
-
-        ent:SetModel(model)
-        ent:SetSkin(weapon:GetSkin() or 0)
-
-        ent.IsTBCDroppedWeapon = true
-        ent.WeaponClass = weaponClass
-        ent.StoredClip = amountToDrop
-        ent.StoredAmmo = primAmmo
-        ent.SlotsTaking = weapon.SlotsTaking or 1
-        ent.SlotType = weapon.SlotType or "Equipment"
-        ent.nodupe = true
-
-        ent.PrintName = weapon.PrintName or weaponClass
-
-        local trace = {}
-        trace.start = ply:GetShootPos()
-        trace.endpos = trace.start + ply:GetAimVector() * 50
-        trace.filter = {ply, weapon, ent}
-        local tr = util.TraceLine(trace)
-
-        ent:SetPos(tr.HitPos)
-        ent:Spawn()
-        TBC_PlaceEntity(ent, tr, ply)
-
-        ply:RemoveAmmo(primAmmo, weapon:GetPrimaryAmmoType())
-        ply:RemoveAmmo(ply:GetAmmoCount(weapon:GetSecondaryAmmoType()), weapon:GetSecondaryAmmoType())
-
-        hook.Call("TBC_WeaponDropped", nil, ply, ent, weapon)
-
-        if weapon.DropFunction then
-            weapon:DropFunction()
-        end
-
-        weapon:TakePrimaryAmmo(amountToDrop)
-
-        local currentAmmo = weapon:Clip1()
-        if currentAmmo <= 0 then
-            weapon:Remove()
-        end
-    end
-
-    concommand.Add(
-        "inventory",
-        function(ply, cmd, args)
-            net.Start("OpenInventory")
-            net.Send(ply)
-        end
-    )
-
-    net.Receive(
-        "DropWeapon",
-        function(len, player)
-            if not IsValid(player) or not player:IsPlayer() then
-                return
-            end
-
-            local classType = net.ReadString()
-            local class = net.ReadString()
-
-            if classType == "swep" then
-                local weapon = player:GetWeapon(class)
-                if IsValid(weapon) then
-                    if player:HasWeapon(class) then
-                        player:TBC_DropWeapon(weapon)
-                    end
-                end
-            elseif classType == "passive" then
-                local ent = ents.Create(class)
-                local weapon = player:GetActiveWeapon()
-
-                local trace = {}
-                trace.start = player:GetShootPos()
-                trace.endpos = trace.start + player:GetAimVector() * 50
-                trace.filter = {player, weapon, ent}
-
-                local tr = util.TraceLine(trace)
-
-                ent:SetPos(tr.HitPos)
-                ent:Spawn()
-
-                TBC_PlaceEntity(ent, tr, player)
-
-                RemoveStat(player, ent.BuffRegistration, ent.BuffType)
-            end
-        end
-    )
-
-    net.Receive(
-        "DropItems",
-        function(len, player)
-            if not IsValid(player) or not player:IsPlayer() then
-                return
-            end
-
-            local amountToDrop = net.ReadInt(32)
-            local classType = net.ReadString()
-            local class = net.ReadString()
-
-            if classType == "swep" then
-                local weapon = player:GetWeapon(class)
-                if IsValid(weapon) then
-                    if player:HasWeapon(class) then
-                        if amountToDrop then
-                            TBC_CreateDroppedWeapon(player, weapon, amountToDrop)
-                        end
-                    end
-                end
-            elseif classType == "passive" then
-                local ent = ents.Create(class)
-                local weapon = player:GetActiveWeapon()
-
-                local trace = {}
-                trace.start = player:GetShootPos()
-                trace.endpos = trace.start + player:GetAimVector() * 50
-                trace.filter = {player, weapon, ent}
-
-                local tr = util.TraceLine(trace)
-
-                ent:SetPos(tr.HitPos)
-                ent:Spawn()
-
-                TBC_PlaceEntity(ent, tr, player)
-
-                RemoveStat(player, ent.BuffRegistration, ent.BuffType)
-            end
-        end
-    )
-
-    net.Receive(
-        "EquipPersona",
-        function(len, player)
-            if not IsValid(player) or not player:IsPlayer() then
-                return
-            end
-
-            local persona = net.ReadString()
-
-            local personaData = Personas[persona]
-
-            if personaData then
-                local oldPersona = player:GetNW2String("selectedPersona", "")
-                local oldPersonaData = Personas[oldPersona]
-
-                if oldPersonaData then
-                    for weaponIndex, weaponClass in pairs(oldPersonaData.skills) do
-                        local weapon = player:GetWeapon(weaponClass)
-                        if IsValid(weapon) then
-                            if player:HasWeapon(weaponClass) then
-                                weapon:Remove()
-                            end
-                        end
-                    end
-                end
-
-                for weaponIndex, weaponClass in pairs(personaData.skills) do
-                    player:Give(weaponClass)
-                end
-
-                local playerSWEP = player:GetWeapon("smti_engageswep")
-
-                local fight = TBCWeaponMetatable.OngoingFights[playerSWEP.FightId]
-                if fight then
-                    if IsValid(playerSWEP) then
-                        for _, weapon in pairs(player:GetWeapons()) do
-                            weapon.FightId = playerSWEP.FightId
-                        end
-
-                        playerSWEP:AnnounceMessage(
-                            player:Name() .. " switched his persona to " .. personaData.name .. "!"
-                        )
-                    end
-                end
-
-                player:SetNW2String("selectedPersona", persona)
-
-                AssignStat(player, persona, persona, "personas")
-            end
-        end
-    )
-
-    net.Receive(
-        "DropPersona",
-        function(len, player)
-            if not IsValid(player) or not player:IsPlayer() then
-                return
-            end
-
-            local persona = net.ReadString()
-            local dropPersona = net.ReadBool()
-
-            local personaData = Personas[persona]
-
-            if personaData then
-                for weaponIndex, weaponClass in pairs(personaData.skills) do
-                    local weapon = player:GetWeapon(weaponClass)
-                    if IsValid(weapon) then
-                        if player:HasWeapon(weaponClass) then
-                            weapon:Remove()
-                        end
-                    end
-                end
-                if player:GetNW2String("selectedPersona", "") == persona then
-                    player:SetNW2String("selectedPersona", "")
-                end
-
-                if dropPersona then
-                    local ent = ents.Create(persona)
-                    local weapon = player:GetActiveWeapon()
-
-                    local trace = {}
-                    trace.start = player:GetShootPos()
-                    trace.endpos = trace.start + player:GetAimVector() * 50
-                    trace.filter = {player, weapon, ent}
-
-                    local tr = util.TraceLine(trace)
-
-                    ent:SetPos(tr.HitPos)
-                    ent:Spawn()
-
-                    TBC_PlaceEntity(ent, tr, player)
-
-                    RemoveStat(player, persona, "personas")
-                end
-            end
-        end
-    )
-
-    -- ============================================================
-    -- Give() wrapper
-    -- ============================================================
-    local meta = FindMetaTable("Player")
-    local OriginalGive = meta.Give
-
-    function meta:Give(weaponClass, noAmmo)
-        self.TBC_AllowPickup = true
-        local wep = OriginalGive(self, weaponClass, noAmmo)
-        self.TBC_AllowPickup = false
-        return wep
-    end
-
-    local function CountUsedSlots(ply)
-        local equipmentUsed = 0
-        local itemsUsed = 0
-
-        for _, weapon in pairs(ply:GetWeapons()) do
-            if weapon.SlotType and weapon.SlotsTaking then
-                if weapon.SlotType == "Equipment" then
-                    equipmentUsed = equipmentUsed + weapon.SlotsTaking
-                elseif weapon.SlotType == "Item" then
-                    itemsUsed = itemsUsed + weapon.SlotsTaking
-                end
-            end
-        end
-
-        local buffs = GetAllStats(ply, "permabuffs")
-        if buffs then
-            for _, ailmentInfo in pairs(buffs) do
-                if ailmentInfo.SlotType and ailmentInfo.SlotsTaking then
-                    if ailmentInfo.SlotType == "Equipment" then
-                        equipmentUsed = equipmentUsed + ailmentInfo.SlotsTaking
-                    elseif ailmentInfo.SlotType == "Item" then
-                        itemsUsed = itemsUsed + ailmentInfo.SlotsTaking
-                    end
-                end
-            end
-        end
-
-        return equipmentUsed, itemsUsed
-    end
-
-    hook.Add(
-        "PlayerCanPickupWeapon",
-        "TBC_BlockAutoPickup",
-        function(ply, weapon)
-            if ply.TBC_AllowPickup then
-                return
-            end
-            return false
-        end
-    )
-
-    local TBC_PickupCooldown = {}
-
-    hook.Add(
-        "PlayerUse",
-        "TBC_PickupDroppedWeapon",
-        function(ply, ent)
-            if not IsValid(ply) or not IsValid(ent) then
-                return
-            end
-            if not ent.IsTBCDroppedWeapon then
-                return
-            end
-
-            local sid = ply:SteamID()
-            if TBC_PickupCooldown[sid] and CurTime() < TBC_PickupCooldown[sid] then
-                return false
-            end
-            TBC_PickupCooldown[sid] = CurTime() + 0.5
-
-            local slotType = ent.SlotType
-            local slotsTaking = ent.SlotsTaking or 0
-
-            if slotsTaking > 0 and slotType then
-                for _, w in ipairs(ply:GetWeapons()) do
-                    if w:GetClass() == ent.WeaponClass then
-                        ply:ChatPrint("You already have this weapon!")
-                        return false
-                    end
-                end
-            end
-
-            if slotsTaking and slotsTaking > 0 and slotType then
-                local maxEquipment = ply:GetNWInt("TBCEquipmentSlots", 15)
-                local maxItems = ply:GetNWInt("TBCItemSlots", 10)
-                local equipmentUsed, itemsUsed = CountUsedSlots(ply)
-
-                if slotType == "Equipment" then
-                    if equipmentUsed + slotsTaking > maxEquipment then
-                        ply:ChatPrint("You've reached your inventory Equipment slots!")
-                        return false
-                    end
-                elseif slotType == "Item" then
-                    local alreadyHas = false
-                    for _, w in ipairs(ply:GetWeapons()) do
-                        if w:GetClass() == ent.WeaponClass then
-                            alreadyHas = true
-                            break
-                        end
-                    end
-
-                    if not alreadyHas and itemsUsed + slotsTaking > maxItems then
-                        ply:ChatPrint("You've reached your inventory Item slots!")
-                        return false
-                    end
-                end
-            end
-
-            local givenWeapon = ply:Give(ent.WeaponClass)
-            if IsValid(givenWeapon) then
-                if ent.StoredClip1 then
-                    givenWeapon:SetClip1(ent.StoredClip1)
-                elseif ent.StoredClip then
-                    givenWeapon:SetClip1(ent.StoredClip)
-                end
-
-                if ent.StoredClip2 then
-                    givenWeapon:SetClip2(ent.StoredClip2)
-                end
-
-                if ent.StoredAmmo and ent.StoredAmmo > 0 then
-                    ply:GiveAmmo(ent.StoredAmmo, givenWeapon:GetPrimaryAmmoType())
-                end
-            end
-
-            ent:Remove()
-            return false
-        end
-    )
-
-    function meta:TBC_DropWeapon(weapon)
-        if not IsValid(self) or not IsValid(weapon) then
-            return
-        end
-
-        local weaponClass = weapon:GetClass()
-        local primAmmo = self:GetAmmoCount(weapon:GetPrimaryAmmoType())
-
-        local model = weapon:GetModel()
-        if model == "models/weapons/v_physcannon.mdl" then
-            model = "models/weapons/w_physics.mdl"
-        end
-        if not util.IsValidModel(model) then
-            model = "models/weapons/w_rif_ak47.mdl"
-        end
-
-        local ent = ents.Create("prop_physics")
-        if not IsValid(ent) then
-            return
-        end
-
-        ent:SetModel(model)
-        ent:SetSkin(weapon:GetSkin() or 0)
-
-        ent.IsTBCDroppedWeapon = true
-        ent.WeaponClass = weaponClass
-        ent.StoredClip1 = weapon:Clip1()
-        ent.StoredClip2 = weapon:Clip2()
-        ent.StoredAmmo = primAmmo
-        ent.SlotsTaking = weapon.SlotsTaking or 1
-        ent.SlotType = weapon.SlotType or "Equipment"
-        ent.nodupe = true
-
-        ent.PrintName = weapon.PrintName or weaponClass
-
-        local trace = {}
-        trace.start = self:GetShootPos()
-        trace.endpos = trace.start + self:GetAimVector() * 50
-        trace.filter = {self, weapon, ent}
-        local tr = util.TraceLine(trace)
-
-        ent:SetPos(tr.HitPos)
-        ent:Spawn()
-        TBC_PlaceEntity(ent, tr, self)
-
-        self:RemoveAmmo(primAmmo, weapon:GetPrimaryAmmoType())
-        self:RemoveAmmo(self:GetAmmoCount(weapon:GetSecondaryAmmoType()), weapon:GetSecondaryAmmoType())
-
-        hook.Call("TBC_WeaponDropped", nil, self, ent, weapon)
-
-        if weapon.DropFunction then
-            weapon:DropFunction()
-        end
-
-        weapon:Remove()
-    end
-
-    local function CanDropWeapon(ply, weapon)
-        if not IsValid(weapon) then
-            return false, "No valid weapon to drop."
-        end
-
-        if weapon:GetModel() == "" then
-            return false, "You cannot drop this weapon."
-        end
-
-        if weapon.PersonaSkill then
-            return false, "You cannot drop a persona skill."
-        end
-
-        local charID = ply:GetNWString("AssignedCharacter", "")
-        if charID ~= "" and CHARACTERS and CHARACTERS.List and CHARACTERS.List[charID] then
-            local character = CHARACTERS.List[charID]
-            if character.weapons then
-                for _, baseWeapon in ipairs(character.weapons) do
-                    if baseWeapon == weapon:GetClass() then
-                        return false, "You cannot drop your character's base weapon."
-                    end
-                end
-            end
-        end
-
-        local canDrop = hook.Run("TBC_CanDropWeapon", ply, weapon)
-        if canDrop == false then
-            return false, "You cannot drop this weapon."
-        end
-
-        return true
-    end
-
-    hook.Add(
-        "PlayerSay",
-        "TBC_DropWeaponCommand",
-        function(ply, text)
-            local cmd = string.lower(text)
-            if cmd ~= "/drop" and cmd ~= "/dropweapon" then
-                return
-            end
-
-            local weapon = ply:GetActiveWeapon()
-            local canDrop, reason = CanDropWeapon(ply, weapon)
-
-            if not canDrop then
-                ply:ChatPrint(reason)
-                return ""
-            end
-
-            ply:DoAnimationEvent(ACT_GMOD_GESTURE_ITEM_DROP)
-
-            timer.Simple(
-                1,
-                function()
-                    if not IsValid(ply) or not IsValid(weapon) then
-                        return
-                    end
-                    if not ply:Alive() then
-                        return
-                    end
-
-                    local stillCanDrop = CanDropWeapon(ply, weapon)
-                    if not stillCanDrop then
-                        return
-                    end
-
-                    ply:TBC_DropWeapon(weapon)
-                end
-            )
-
-            return ""
-        end
-    )
-
-    return
-end
-
 -- ================================================================
 -- CLIENT
 -- ================================================================
 
 local PANEL = {}
 local TabMenu = nil
+
+-- ----------------------------------------------------------------
+--  Profession System (Client)
+-- ----------------------------------------------------------------
+local ClientPlayerProfession = "Cooking"
+local ProfessionChangeTime = 0
+local ProfessionCombo = nil
+
+SMT_PROFESSIONS = {
+    "Cooking",
+    "Alchemy",
+    "Crafting",
+    "Genius"
+}
+
+net.Receive(
+    "SyncProfession",
+    function()
+        ClientPlayerProfession = net.ReadString()
+        if IsValid(ProfessionCombo) then
+            ProfessionCombo:SetValue(ClientPlayerProfession)
+        end
+    end
+)
+
+function GetClientProfession()
+    return ClientPlayerProfession
+end
+
+function SMT_GetPlayerProfession()
+    return ClientPlayerProfession
+end
+
+function SetClientProfession(profession)
+    net.Start("ChangeProfession")
+    net.WriteString(profession)
+    net.SendToServer()
+end
 
 -- ----------------------------------------------------------------
 --  Inventory helpers (shared client-side state)
@@ -845,6 +338,10 @@ function PANEL:Init()
     if self.Tabs[1] then
         self:SelectTab(self.Tabs[1])
     end
+
+    -- Request profession data from server
+    net.Start("RequestProfessionData")
+    net.SendToServer()
 end
 
 function PANEL:AddTab(name, icon)
@@ -949,6 +446,60 @@ function PANEL:LoadPlayerContent()
     SectionHeader("Identity")
     DataRow("Username", ply:Nick(), Color(255, 255, 255))
     DataRow("Steam ID", ply:SteamID(), Color(180, 200, 255))
+
+    -- ================================================================
+    --  Profession Selection
+    -- ================================================================
+    SectionHeader("Profession")
+    
+    local professionPanel = vgui.Create("DPanel", scroll)
+    professionPanel:Dock(TOP)
+    professionPanel:SetTall(40)
+    professionPanel:DockMargin(0, 2, 0, 2)
+    professionPanel.Paint = function(s, w, h)
+        draw.RoundedBox(3, 0, 0, w, h, Color(45, 45, 45, 200))
+    end
+
+    local profLabel = vgui.Create("DLabel", professionPanel)
+    profLabel:Dock(LEFT)
+    profLabel:SetText("Current Profession:")
+    profLabel:SetFont("DermaDefault")
+    profLabel:SetTextColor(Color(160, 160, 160))
+    profLabel:SetWide(KEY_W)
+    profLabel:DockMargin(10, 0, 0, 0)
+
+    local profCombo = vgui.Create("DComboBox", professionPanel)
+    profCombo:Dock(FILL)
+    profCombo:DockMargin(10, 5, 10, 5)
+
+    -- Add profession options
+    if SMT_PROFESSIONS then
+        for _, prof in ipairs(SMT_PROFESSIONS) do
+            profCombo:AddChoice(prof)
+        end
+    end
+
+    ProfessionCombo = profCombo
+    local currentProfession = GetClientProfession()
+    profCombo:SetValue(currentProfession)
+
+    -- Track when the combo box value changes
+    local lastComboValue = currentProfession
+    profCombo.OnSelect = function(self, index, value)
+        if value ~= lastComboValue then
+            local currentTime = CurTime()
+            if currentTime < ProfessionChangeTime then
+                local remainingTime = math.ceil(ProfessionChangeTime - currentTime)
+                ply:ChatPrint("You can change professions again in " .. remainingTime .. " seconds.")
+                profCombo:SetValue(lastComboValue)
+                return
+            end
+
+            lastComboValue = value
+            ProfessionChangeTime = currentTime + 5
+            SetClientProfession(value)
+        end
+    end
 
     local hasCharSystem = CHARACTERS ~= nil and CHARACTERS.List ~= nil
     if hasCharSystem then
@@ -1110,7 +661,7 @@ function PANEL:LoadPlayerContent()
 end
 
 -- ----------------------------------------------------------------
---  Inventory tab  (replaces tbc_inventory OpenInventory net receiver)
+--  Inventory tab
 -- ----------------------------------------------------------------
 function PANEL:LoadInventoryContent()
     local bgColor     = Color(44, 47, 51, 255)
@@ -1130,7 +681,6 @@ function PANEL:LoadInventoryContent()
         end
     end
 
-    -- Close detail window if the whole tab menu closes while inventory is open
     local origRemove = self.OnRemove
     self.OnRemove = function(s)
         if IsValid(detailFrame) then
@@ -1142,12 +692,14 @@ function PANEL:LoadInventoryContent()
     local equipmentPanel = vgui.Create("DPanel", sheet)
     local itemsPanel     = vgui.Create("DPanel", sheet)
     local personasPanel  = vgui.Create("DPanel", sheet)
+    local resourcesPanel = vgui.Create("DPanel", sheet)   -- NEW
 
     sheet:AddSheet("Equipment", equipmentPanel, "icon16/gun.png")
     sheet:AddSheet("Items",     itemsPanel,     "icon16/gun.png")
     sheet:AddSheet("Personas",  personasPanel,  "icon16/user_suit.png")
+    sheet:AddSheet("Resources", resourcesPanel, "icon16/box.png")  -- NEW
 
-    -- Shared grid painters
+    -- Shared grid painter
     local function GridPaint(s, w, h)
         draw.RoundedBox(6, 0, 0, w, h, bgColor)
     end
@@ -1182,7 +734,134 @@ function PANEL:LoadInventoryContent()
     personasGrid:SetRowHeight(64)
     personasGrid.Paint = GridPaint
 
+    -- ---- Resources ---- (NEW)
+    resourcesPanel.Paint = function(s, w, h) draw.RoundedBox(6, 0, 0, w, h, bgColor) end
+
+    local ROW_H     = 36
+    local BAR_MAX_W = 300   -- width that represents a full stack (1000)
+    local CAP       = 1000
+
+    -- Header strip
+    local headerStrip = vgui.Create("DPanel", resourcesPanel)
+    headerStrip:Dock(TOP)
+    headerStrip:SetTall(32)
+    headerStrip:DockMargin(10, 8, 10, 0)
+    headerStrip.Paint = function(s, w, h)
+        draw.RoundedBox(4, 0, 0, w, h, headerColor)
+        draw.SimpleText("Resource",  "DermaDefaultBold", 10,          h / 2, Color(180, 180, 180), TEXT_ALIGN_LEFT,   TEXT_ALIGN_CENTER)
+        draw.SimpleText("Amount",    "DermaDefaultBold", w - 230,     h / 2, Color(180, 180, 180), TEXT_ALIGN_LEFT,   TEXT_ALIGN_CENTER)
+        draw.SimpleText("Capacity",  "DermaDefaultBold", w - 150,     h / 2, Color(180, 180, 180), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+
+    local scroll = vgui.Create("DScrollPanel", resourcesPanel)
+    scroll:Dock(FILL)
+    scroll:DockMargin(10, 6, 10, 10)
+
+    -- Populates (or re-populates) the scroll panel with the current resources.
+    local function RefreshResources()
+        scroll:Clear()
+
+        local ply       = LocalPlayer()
+        local resources = GetAllResourcesByPlayerClient and GetAllResourcesByPlayerClient(ply) or {}
+        local sorted    = {}
+
+        for resType, amount in pairs(resources) do
+            table.insert(sorted, {resType = resType, amount = amount})
+        end
+
+        -- Alphabetical order for stable display
+        table.sort(sorted, function(a, b) return a.resType < b.resType end)
+
+        if #sorted == 0 then
+            local emptyLabel = vgui.Create("DLabel", scroll)
+            emptyLabel:Dock(TOP)
+            emptyLabel:SetTall(40)
+            emptyLabel:SetText("You have no resources.")
+            emptyLabel:SetFont("DermaDefault")
+            emptyLabel:SetTextColor(Color(150, 150, 150))
+            emptyLabel:SetContentAlignment(5)
+            return
+        end
+
+        for _, entry in ipairs(sorted) do
+            local resType = entry.resType
+            local amount  = entry.amount
+
+            -- Capitalise first letter for display
+            local displayName = string.upper(string.sub(resType, 1, 1)) ..
+                                string.sub(resType, 2)
+
+            local fraction = math.Clamp(amount / CAP, 0, 1)
+
+            -- Colour the bar: green at low fill, shifting to amber at 75 %+, red at cap
+            local function BarColor(frac)
+                if frac >= 1 then
+                    return Color(220, 60, 60, 255)
+                elseif frac >= 0.75 then
+                    return Color(220, 160, 40, 255)
+                else
+                    return Color(60, 180, 80, 255)
+                end
+            end
+
+            local row = vgui.Create("DPanel", scroll)
+            row:Dock(TOP)
+            row:SetTall(ROW_H)
+            row:DockMargin(0, 2, 0, 2)
+
+            -- Capture values for the Paint closure
+            local capturedAmount   = amount
+            local capturedFraction = fraction
+            local capturedName     = displayName
+
+            row.Paint = function(s, w, h)
+                -- Row background, alternating shades
+                draw.RoundedBox(4, 0, 0, w, h, Color(50, 53, 58, 220))
+
+                -- Resource name
+                draw.SimpleText(capturedName, "DermaDefault",
+                    10, h / 2,
+                    Color(220, 220, 220), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+
+                -- Numeric amount + cap
+                local amtStr = tostring(capturedAmount) .. " / " .. tostring(CAP)
+                draw.SimpleText(amtStr, "DermaDefault",
+                    w - 230, h / 2,
+                    Color(200, 200, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+
+                -- Bar background
+                local barX = w - 155
+                local barY = (h - 14) / 2
+                draw.RoundedBox(3, barX,     barY, BAR_MAX_W, 14, Color(30, 30, 30, 200))
+
+                -- Bar fill
+                local fillW = math.max(0, math.floor(BAR_MAX_W * capturedFraction))
+                if fillW > 0 then
+                    draw.RoundedBox(3, barX, barY, fillW, 14, BarColor(capturedFraction))
+                end
+            end
+        end
+    end
+
+    -- Initial population
+    RefreshResources()
+
+    -- Re-populate whenever a resource update comes in so the tab stays live
+    -- (net.Receive already fires globally; we hook the HUDPaint tick while
+    --  this panel is visible as a lightweight poll — avoids a global hook leak)
+    local lastPoll  = 0
+    local POLL_RATE = 2  -- seconds between polls while the tab is open
+
+    resourcesPanel.Think = function(s)
+        if not s:IsVisible() then return end
+        if CurTime() - lastPoll < POLL_RATE then return end
+        lastPoll = CurTime()
+        RefreshResources()
+    end
+
+    -- ----------------------------------------------------------------
     -- Reference to the Content panel so detail window can anchor to it
+    -- ----------------------------------------------------------------
     local anchorPanel = self.Content
 
     -- ----------------------------------------------------------------
@@ -1221,7 +900,7 @@ function PANEL:LoadInventoryContent()
             local equipmentData = {}
 
             if weaponData then
-                equipmentData.name      = weaponData.PrintName
+                equipmentData.name        = weaponData.PrintName
                 equipmentData.description = weaponData.Purpose
                 local iconPath = "materials/entities/" .. equipment .. ".png"
                 if not file.Exists(iconPath, "GAME") then iconPath = "materials/entities/what.png" end
@@ -1229,11 +908,11 @@ function PANEL:LoadInventoryContent()
                 equipmentData.classname = equipment
                 equipmentData.droppable = not weaponData.PersonaSkill and CheckIfWeaponJob(ply, equipment, "weapon")
             elseif passiveData then
-                equipmentData.name      = passiveData.name
+                equipmentData.name        = passiveData.name
                 equipmentData.description = passiveData.description
-                equipmentData.image     = passiveData.image or "materials/entities/what.png"
-                equipmentData.classname = passiveData.classname
-                equipmentData.droppable = not passiveData.PersonaSkill and CheckIfWeaponJob(ply, passiveData.classname, "passive")
+                equipmentData.image       = passiveData.image or "materials/entities/what.png"
+                equipmentData.classname   = passiveData.classname
+                equipmentData.droppable   = not passiveData.PersonaSkill and CheckIfWeaponJob(ply, passiveData.classname, "passive")
             end
 
             if equipmentData.name then
@@ -1304,13 +983,13 @@ function PANEL:LoadInventoryContent()
 
             if weaponData then
                 local ammoStr = weaponData.ShowAmmo and weaponData:ShowAmmo(ply, item) or "?"
-                itemData.name           = weaponData.PrintName
-                itemData.description    = (weaponData.Purpose or "") .. " Remaining: " .. ammoStr
+                itemData.name            = weaponData.PrintName
+                itemData.description     = (weaponData.Purpose or "") .. " Remaining: " .. ammoStr
                 local iconPath = "materials/entities/" .. item .. ".png"
                 if not file.Exists(iconPath, "GAME") then iconPath = "materials/entities/what.png" end
-                itemData.image          = iconPath
-                itemData.classname      = item
-                itemData.droppable      = not weaponData.PersonaSkill and CheckIfWeaponJob(ply, item, "weapon")
+                itemData.image           = iconPath
+                itemData.classname       = item
+                itemData.droppable       = not weaponData.PersonaSkill and CheckIfWeaponJob(ply, item, "weapon")
                 itemData.RemainingAmount = ammoStr
             elseif passiveData then
                 itemData.name        = passiveData.name
@@ -1384,17 +1063,16 @@ function PANEL:LoadInventoryContent()
 
         for personaName, _ in pairs(personas) do
             local personaData = Personas and Personas[personaName]
-            if not personaData then continue end
+            if personaData then
+                local personaDroppable = true
+                if permapersonas and permapersonas[personaName] then
+                    personaDroppable = false
+                end
 
-            local personaDroppable = true
-            if permapersonas and permapersonas[personaName] then
-                personaDroppable = false
-            end
-
-            local btn = vgui.Create("DImageButton")
-            btn:SetSize(64, 64)
-            btn:SetImage(personaData.image)
-            btn:SetTooltip(personaData.name)
+                local btn = vgui.Create("DImageButton")
+                btn:SetSize(64, 64)
+                btn:SetImage(personaData.image)
+                btn:SetTooltip(personaData.name)
 
             if personaName == ply:GetNW2String("selectedPersona", "") then
                 btn.PaintOver = function(s, w, h)
@@ -1447,6 +1125,8 @@ function PANEL:LoadInventoryContent()
                 end
 
                 menu:Open()
+            end
+
             end
 
             personasGrid:AddItem(btn)
@@ -2088,6 +1768,8 @@ hook.Add(
                     detailFrame:Close()
                 end
             else
+                net.Start("RequestProfessionData")
+                net.SendToServer()
                 TabMenu:SetVisible(true)
                 TabMenu:MakePopup()
             end
@@ -2101,6 +1783,8 @@ net.Receive(
         if not IsValid(TabMenu) then
             TabMenu = vgui.Create("CustomTabMenu")
         end
+        net.Start("RequestProfessionData")
+        net.SendToServer()
         TabMenu:SetVisible(true)
         TabMenu:MakePopup()
 

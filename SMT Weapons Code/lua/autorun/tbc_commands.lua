@@ -105,28 +105,38 @@ if SERVER then
             local currentTurnPlayer =
                 fight[currentActiveSide][fight.ActiveMember]
 
+            -- The entity whose One More is being passed: the player, or their
+            -- demon companion if they are acting through it on its turn
+            local actingEntity = ply
+
             if currentTurnPlayer ~= ply then
-                ply:ChatPrint("It's not your turn yet.")
-                return ""
+                local controlledDemon = ply.TBCControlledDemon
+                if IsValid(controlledDemon) and currentTurnPlayer == controlledDemon then
+                    actingEntity = controlledDemon
+                else
+                    ply:ChatPrint("It's not your turn yet.")
+                    return ""
+                end
             end
 
             if fight.TurnCounter > 1 then
-                local userBuffsTable = GetAllStats(ply, "buffs")
+                local userBuffsTable = GetAllStats(actingEntity, "buffs")
                 if userBuffsTable["One_More"] then
-                    local currentActiveMember = fight.ActiveMember
-                    if fight.ActiveMember > #fight[fight.ActiveSide] then
-                        currentActiveMember = 1
+                    -- pass to the NEXT member in the turn order, wrapping around
+                    local nextMemberIndex = fight.ActiveMember + 1
+                    if nextMemberIndex > #fight[fight.ActiveSide] then
+                        nextMemberIndex = 1
                     end
 
                     local nextTurnPlayer =
-                        fight[fight.ActiveSide][currentActiveMember]
+                        fight[fight.ActiveSide][nextMemberIndex]
 
-                    engageWeapon:AnnounceMessage(ply:Name() ..
+                    engageWeapon:AnnounceMessage(actingEntity:Name() ..
                                                      " has passed the baton to " ..
                                                      nextTurnPlayer:Name() ..
                                                      "!")
 
-                    RemoveStat(ply, "One_More", "buffs")
+                    RemoveStat(actingEntity, "One_More", "buffs")
 
                     local targetBuffsTable =
                         GetAllStats(nextTurnPlayer, "buffs")

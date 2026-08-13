@@ -1,0 +1,8 @@
+"UnlitGeneric"
+{
+    "$basetexture" "smt_particles/ice_shard"
+    "$translucent" "1"
+    "$additive" "1"
+    "$vertexcolor" "1"
+    "$vertexalpha" "1"
+}

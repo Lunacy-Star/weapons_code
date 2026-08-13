@@ -23,12 +23,14 @@ function TBCWeaponMetatable:AnnounceAbility()
 
     local playersInFight = {}
     for _, player in ipairs(fight.Side1) do
-        if IsValid(player) then
+        -- Demons don't get their own chat line; their master already
+        -- receives this message directly as a fight member in their own right.
+        if IsValid(player) and player:IsPlayer() then
             table.insert(playersInFight, player)
         end
     end
     for _, player in ipairs(fight.Side2) do
-        if IsValid(player) then
+        if IsValid(player) and player:IsPlayer() then
             table.insert(playersInFight, player)
         end
     end
@@ -54,12 +56,14 @@ function TBCWeaponMetatable:AnnounceMessage(message)
 
     local playersInFight = {}
     for _, player in ipairs(fight.Side1) do
-        if IsValid(player) then
+        -- Demons don't get their own chat line; their master already
+        -- receives this message directly as a fight member in their own right.
+        if IsValid(player) and player:IsPlayer() then
             table.insert(playersInFight, player)
         end
     end
     for _, player in ipairs(fight.Side2) do
-        if IsValid(player) then
+        if IsValid(player) and player:IsPlayer() then
             table.insert(playersInFight, player)
         end
     end
@@ -425,6 +429,12 @@ function TBCWeaponMetatable:StartFight(target)
             end
 
             if fight then
+                -- Deployed demon companions join the fight right after their master,
+                -- so they get their own turn in the cycle (charData.turns each).
+                if DEMONCOMP and DEMONCOMP.InsertFightDemons then
+                    DEMONCOMP.InsertFightDemons(fight, fightId)
+                end
+
                 local attackerTech = 0
                 local targetTech = 0
 
@@ -526,9 +536,11 @@ function TBCWeaponMetatable:StartFight(target)
 
                         player:EmitSound("common/stuck1.wav")
 
-                        net.Start("PlayBattleMusic")
-                        net.WriteEntity(player)
-                        net.Send(player)
+                        if player:IsPlayer() then
+                            net.Start("PlayBattleMusic")
+                            net.WriteEntity(player)
+                            net.Send(player)
+                        end
                     end
                 end
 
@@ -577,9 +589,11 @@ function TBCWeaponMetatable:StartFight(target)
 
                         player:EmitSound("common/stuck1.wav")
 
-                        net.Start("PlayBattleMusic")
-                        net.WriteEntity(player)
-                        net.Send(player)
+                        if player:IsPlayer() then
+                            net.Start("PlayBattleMusic")
+                            net.WriteEntity(player)
+                            net.Send(player)
+                        end
                     end
                 end
             end
@@ -606,6 +620,11 @@ function TBCWeaponMetatable:JoinFight(side)
         -- Propagate the FightId to all weapons of the player
         for _, weapon in pairs(self.Owner:GetWeapons()) do
             weapon.FightId = self.FightId
+        end
+
+        -- The joiner's deployed demon companions enter right after them
+        if DEMONCOMP and DEMONCOMP.InsertFightDemonsForPlayer then
+            DEMONCOMP.InsertFightDemonsForPlayer(fight, self.FightId, self.Owner)
         end
     end
 end
@@ -724,6 +743,11 @@ function TBCWeaponMetatable:ClearFightId(player)
         return
     end -- Ensure the player is valid
 
+    -- Demon companions store their FightId on the entity itself
+    if player.isTBCDemon then
+        player.FightId = nil
+    end
+
     for _, weapon in pairs(player:GetWeapons()) do
         if weapon.FightId then
             weapon.FightId = nil -- Clear the FightId
@@ -774,55 +798,74 @@ function TBCWeaponMetatable:CheckForTeamDefeat(fightId)
     local allGoneSide1 = #fight.Side1 == 0
     local allGoneSide2 = #fight.Side2 == 0
 
+    -- Snapshot both sides before killing anyone: Kill()/death hooks remove
+    -- members from the live arrays while we iterate, which skips members
+    local side1Members = {}
+    for _, member in ipairs(fight.Side1) do
+        table.insert(side1Members, member)
+    end
+    local side2Members = {}
+    for _, member in ipairs(fight.Side2) do
+        table.insert(side2Members, member)
+    end
+
     -- If all players on a side are "dead", trigger their gmod death
     if allDeadSide1 or allGoneSide1 then
-        for _, player in ipairs(fight.Side1) do
-            player:Kill()
+        for _, player in ipairs(side1Members) do
+            if IsValid(player) then player:Kill() end
         end
     elseif allDeadSide2 or allGoneSide2 then
-        for _, player in ipairs(fight.Side2) do
-            player:Kill()
+        for _, player in ipairs(side2Members) do
+            if IsValid(player) then player:Kill() end
         end
     end
 
     if (allDeadSide1 or allDeadSide2) or (allGoneSide1 or allGoneSide2) then
-        for _, player in ipairs(fight.Side1) do
-            local playerSWEP = player:GetWeapon("smti_engageswep")
-            if IsValid(playerSWEP) then
-                playerSWEP.InCombat = false
-                playerSWEP.Enemy = nil
-                playerSWEP.Allies = {}
-            end
+        for _, player in ipairs(side1Members) do
+            if IsValid(player) then
+                local playerSWEP = player:GetWeapon("smti_engageswep")
+                if IsValid(playerSWEP) then
+                    playerSWEP.InCombat = false
+                    playerSWEP.Enemy = nil
+                    playerSWEP.Allies = {}
+                end
 
-            TBCWeaponMetatable:ClearFightId(player)
+                TBCWeaponMetatable:ClearFightId(player)
+            end
         end
 
-        for _, player in ipairs(fight.Side2) do
-            local playerSWEP = player:GetWeapon("smti_engageswep")
-            if IsValid(playerSWEP) then
-                playerSWEP.InCombat = false
-                playerSWEP.Enemy = nil
-                playerSWEP.Allies = {}
-            end
+        for _, player in ipairs(side2Members) do
+            if IsValid(player) then
+                local playerSWEP = player:GetWeapon("smti_engageswep")
+                if IsValid(playerSWEP) then
+                    playerSWEP.InCombat = false
+                    playerSWEP.Enemy = nil
+                    playerSWEP.Allies = {}
+                end
 
-            TBCWeaponMetatable:ClearFightId(player)
+                TBCWeaponMetatable:ClearFightId(player)
+            end
         end
 
         -- Check if the victory message has already been sent for this fight
         if not victoryMessageSent[fightId] and victoryMessageSent[fightId] ~= nil then
             if allDeadSide1 then
-                for _, player in ipairs(fight.Side2) do
-                    player:ChatPrint("You have won the fight!")
-                    net.Start("PlayVictoryMusic")
-                    net.WriteEntity(player)
-                    net.Send(player)
+                for _, player in ipairs(side2Members) do
+                    if IsValid(player) and player:IsPlayer() then
+                        player:ChatPrint("You have won the fight!")
+                        net.Start("PlayVictoryMusic")
+                        net.WriteEntity(player)
+                        net.Send(player)
+                    end
                 end
             elseif allDeadSide2 then
-                for _, player in ipairs(fight.Side1) do
-                    player:ChatPrint("You have won the fight!")
-                    net.Start("PlayVictoryMusic")
-                    net.WriteEntity(player)
-                    net.Send(player)
+                for _, player in ipairs(side1Members) do
+                    if IsValid(player) and player:IsPlayer() then
+                        player:ChatPrint("You have won the fight!")
+                        net.Start("PlayVictoryMusic")
+                        net.WriteEntity(player)
+                        net.Send(player)
+                    end
                 end
             end
             -- Mark the victory message as sent for this fight
@@ -894,6 +937,12 @@ function TBCWeaponMetatable:Escape()
             for i, player in ipairs(players) do
                 if player == ply then
                     table.remove(players, i)
+
+                    -- The escapee's demon companions flee with them
+                    if DEMONCOMP and DEMONCOMP.RemoveMastersDemonsFromFight then
+                        DEMONCOMP.RemoveMastersDemonsFromFight(fight, ply)
+                    end
+
                     self:AnnounceMessage(ply:Name() .. " has escaped the fight!")
                     ply:ChatPrint("You've successfully escaped the fight!")
 
@@ -931,13 +980,14 @@ function TBCWeaponMetatable:CheckEndFight()
 
     local allRequestedEnd = true
     for _, player in ipairs(fight.Side1) do
-        if not fight.EndRequests[player:UserID()] then
+        -- demon companions don't vote
+        if not player.isTBCDemon and not fight.EndRequests[player:UserID()] then
             allRequestedEnd = false
             break
         end
     end
     for _, player in ipairs(fight.Side2) do
-        if not fight.EndRequests[player:UserID()] then
+        if not player.isTBCDemon and not fight.EndRequests[player:UserID()] then
             allRequestedEnd = false
             break
         end
@@ -956,9 +1006,11 @@ function TBCWeaponMetatable:CheckEndFight()
 
             TBCWeaponMetatable:ClearFightId(player)
 
-            net.Start("PlayEndFightMusic")
-            net.WriteEntity(player)
-            net.Send(player)
+            if player:IsPlayer() then
+                net.Start("PlayEndFightMusic")
+                net.WriteEntity(player)
+                net.Send(player)
+            end
         end
 
         for _, player in ipairs(fight.Side2) do
@@ -971,9 +1023,11 @@ function TBCWeaponMetatable:CheckEndFight()
 
             TBCWeaponMetatable:ClearFightId(player)
 
-            net.Start("PlayEndFightMusic")
-            net.WriteEntity(player)
-            net.Send(player)
+            if player:IsPlayer() then
+                net.Start("PlayEndFightMusic")
+                net.WriteEntity(player)
+                net.Send(player)
+            end
         end
 
         timer.Remove(FightId)
@@ -996,7 +1050,9 @@ function TBCWeaponMetatable:CheckAFK()
 
     -- Loop through only the players on the same side as the active player
     for _, player in ipairs(activeSidePlayers) do
-        if player ~= currentTurnPlayer and not fight.AFKRequests[player:UserID()] then
+        -- demon companions don't vote
+        if player ~= currentTurnPlayer and not player.isTBCDemon and
+            not fight.AFKRequests[player:UserID()] then
             allVotedAFK = false
             break
         end
@@ -1026,7 +1082,16 @@ function TBCWeaponMetatable:EndAbility()
 
                 local buffsTable = GetAllStats(ply, "buffs")
 
-                if not buffsTable["One_More"] then
+                local hasOneMore = buffsTable["One_More"] ~= nil
+
+                -- If the player is acting through a demon companion, One More
+                -- lands on the demon instead - honor it as well
+                if not hasOneMore and IsValid(ply.TBCControlledDemon) then
+                    local demonBuffs = GetAllStats(ply.TBCControlledDemon, "buffs")
+                    hasOneMore = demonBuffs["One_More"] ~= nil
+                end
+
+                if not hasOneMore then
                     self:AnnounceMessage(ply:Name() .. "'s turn has ended!")
                     RunConsoleCommand("useturn")
                 else
