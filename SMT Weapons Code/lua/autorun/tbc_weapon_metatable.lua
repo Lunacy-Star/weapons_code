@@ -383,6 +383,159 @@ function TBCWeaponMetatable:AilmentCheck(player, turnType)
     end
 end
 
+-- ============================================================
+-- Party <-> Fight integration
+-- ============================================================
+if SERVER then
+    local PARTY_ENGAGE_RADIUS = 1000
+    local PARTY_SYNC_INTERVAL = 0.5
+
+    local function CanPullIntoFight(ply)
+        if not IsValid(ply) or not ply:IsPlayer() then
+            return false
+        end
+        if ply:GetNWInt("TBCHP", 0) <= 0 then
+            return false
+        end
+        local sw = ply:GetWeapon("smti_engageswep")
+        return IsValid(sw) and not sw.InCombat
+    end
+
+    -- Inserts newMember into list so that, among members who are part of
+    -- partyOrder, relative placement follows the party's turn order.
+    -- Members not tracked in partyOrder are left exactly where they are.
+    local function InsertRespectingPartyOrder(list, newMember, partyOrder)
+        local newIdx
+        for i, sid in ipairs(partyOrder) do
+            if sid == newMember:SteamID() then
+                newIdx = i
+                break
+            end
+        end
+
+        if not newIdx then
+            table.insert(list, newMember)
+            return
+        end
+
+        for i, member in ipairs(list) do
+            if IsValid(member) and member:IsPlayer() then
+                local memberIdx
+                for j, sid in ipairs(partyOrder) do
+                    if sid == member:SteamID() then
+                        memberIdx = j
+                        break
+                    end
+                end
+
+                if memberIdx and memberIdx > newIdx then
+                    table.insert(list, i, newMember)
+                    return
+                end
+            end
+        end
+
+        table.insert(list, newMember)
+    end
+
+    -- Pulls in-range, eligible party members of each side's anchor (the
+    -- original engager/target) into that side, preserving the party's turn
+    -- order. Safe to call repeatedly - already-seated members are skipped.
+    function TBC_SyncPartyMembersIntoFight(fightId)
+        local fight = TBCWeaponMetatable.OngoingFights[fightId]
+        if not fight then
+            return
+        end
+
+        for _, side in ipairs({"Side1", "Side2"}) do
+            local anchor = fight[side][1]
+            if IsValid(anchor) and anchor:IsPlayer() then
+                local partyId = IsPlayerInAnyParty(anchor)
+                local party = partyId and PlayerParties[partyId]
+
+                if party and party.Order then
+                    local anchorPos = anchor:GetPos()
+
+                    for _, steamID in ipairs(party.Order) do
+                        local member = party.Members[steamID]
+
+                        if member ~= anchor and CanPullIntoFight(member) and
+                            not table.HasValue(fight.Side1, member) and
+                            not table.HasValue(fight.Side2, member) and
+                            member:GetPos():DistToSqr(anchorPos) <= (PARTY_ENGAGE_RADIUS * PARTY_ENGAGE_RADIUS) then
+
+                            InsertRespectingPartyOrder(fight[side], member, party.Order)
+
+                            for _, weapon in pairs(member:GetWeapons()) do
+                                weapon.FightId = fightId
+                            end
+
+                            local memberSWEP = member:GetWeapon("smti_engageswep")
+                            if IsValid(memberSWEP) then
+                                memberSWEP.InCombat = true
+                            end
+
+                            if DEMONCOMP and DEMONCOMP.InsertFightDemonsForPlayer then
+                                DEMONCOMP.InsertFightDemonsForPlayer(fight, fightId, member)
+                            end
+
+                            local anchorSWEP = anchor:GetWeapon("smti_engageswep")
+                            if IsValid(anchorSWEP) then
+                                anchorSWEP:AnnounceMessage(member:Nick() .. " has joined the battle!")
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Starts the repeating scan that pulls late-arriving party members in
+    -- while the fight is still in its preparation window. Cancels itself
+    -- once the fight actually starts (or disappears).
+    function TBC_StartPartySyncWindow(fightId)
+        local timerName = fightId .. "_PartySync"
+
+        timer.Create(timerName, PARTY_SYNC_INTERVAL, 0, function()
+            local fight = TBCWeaponMetatable.OngoingFights[fightId]
+            if not fight or fight.Started then
+                timer.Remove(timerName)
+                return
+            end
+
+            TBC_SyncPartyMembersIntoFight(fightId)
+        end)
+    end
+
+    -- Called when a player without a party manually joins an existing fight
+    -- side. If a current member of that side already has a party, the
+    -- joiner is added to it. Otherwise, if the side has other members, a
+    -- new party is formed around them so the group is tracked going forward.
+    function TBC_EnsurePartyForSideJoin(fight, side, joiningPlayer)
+        if not IsValid(joiningPlayer) or IsPlayerInAnyParty(joiningPlayer) then
+            return
+        end
+
+        local anchorWithParty, fallbackAnchor
+        for _, member in ipairs(fight[side]) do
+            if member ~= joiningPlayer and IsValid(member) and member:IsPlayer() then
+                fallbackAnchor = fallbackAnchor or member
+                if IsPlayerInAnyParty(member) then
+                    anchorWithParty = member
+                    break
+                end
+            end
+        end
+
+        if anchorWithParty then
+            AssignParty(joiningPlayer, IsPlayerInAnyParty(anchorWithParty))
+        elseif fallbackAnchor then
+            local partyId = CreateParty(fallbackAnchor)
+            AssignParty(joiningPlayer, partyId)
+        end
+    end
+end
+
 function TBCWeaponMetatable:StartFight(target)
     local fightId = self.Owner:UserID() .. "_" .. target:UserID()
     self.FightId = fightId
@@ -409,6 +562,13 @@ function TBCWeaponMetatable:StartFight(target)
     end
 
     victoryMessageSent[fightId] = false
+
+    -- Pull in any of the engager's/target's party members already nearby,
+    -- then keep scanning for late arrivals until the fight actually starts.
+    if SERVER then
+        TBC_SyncPartyMembersIntoFight(fightId)
+        TBC_StartPartySyncWindow(fightId)
+    end
 
     -- Create the timer
     timer.Create(
@@ -615,6 +775,10 @@ end
 function TBCWeaponMetatable:JoinFight(side)
     local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
     if fight then
+        if SERVER then
+            TBC_EnsurePartyForSideJoin(fight, side, self.Owner)
+        end
+
         table.insert(fight[side], self.Owner)
 
         -- Propagate the FightId to all weapons of the player

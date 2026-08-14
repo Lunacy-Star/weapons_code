@@ -55,6 +55,76 @@ hook.Add(
     end
 )
 
+-- Draws one member's name/HP/MP/ailment row at the given top-left position.
+-- Shared by the in-fight roster, the out-of-combat party roster, and the
+-- solo (no party) fallback so all three look and behave identically.
+local function DrawRosterMemberRow(memberInfo, xPosition, yPos, textColor)
+    draw.RoundedBox(4, xPosition, yPos, 190, 60, Color(0, 0, 0, 150))
+
+    -- Draw each member's information
+    draw.SimpleText(memberInfo:Name(), "TargetID", xPosition, yPos, textColor)
+    draw.SimpleText(
+        "HP: " .. memberInfo:GetNWInt("TBCHP", 100) .. "/" .. memberInfo:GetNWInt("TBCMAXHP", 100),
+        "TargetID",
+        xPosition,
+        yPos + 20,
+        textColor
+    )
+    draw.SimpleText(
+        "MP: " .. memberInfo:GetNWInt("TBCMP") .. "/" .. memberInfo:GetNWInt("TBCMAXMP", 100),
+        "TargetID",
+        xPosition,
+        yPos + 35,
+        textColor
+    )
+
+    -- Draw ailments
+    if PlayerStats and PlayerStats[memberInfo:SteamID()] then
+        local buffs = GetAllStatsClient(memberInfo, "buffs")
+        local debuffs = GetAllStatsClient(memberInfo, "debuffs")
+
+        if buffs then
+            local ailmentXPos = xPosition + 200
+            local ailmentYPos = yPos + 30
+            for ailmentName, ailmentInfo in pairs(buffs) do
+                if not (ailmentInfo.visibility == 0) then
+                    local ailmentText =
+                        string.gsub(ailmentName, "_", " ") .. " " .. ailmentInfo.stacks .. "x"
+
+                    -- Set the font that we're going to measure the size of
+                    surface.SetFont("TargetID")
+
+                    -- Get the size of the ailmentText
+                    local textWidth, textHeight = surface.GetTextSize(ailmentText)
+
+                    draw.SimpleText(ailmentText, "TargetID", ailmentXPos, ailmentYPos, textColor)
+                    ailmentXPos = ailmentXPos + textWidth + 5 -- add a small buffer after each ailment
+                end
+            end
+        end
+
+        if debuffs then
+            local ailmentXPos = xPosition + 200
+            local ailmentYPos = yPos + 10
+            for ailmentName, ailmentInfo in pairs(debuffs) do
+                if not (ailmentInfo.visibility == 0) then
+                    local ailmentText =
+                        string.gsub(ailmentName, "_", " ") .. " " .. ailmentInfo.stacks .. "x"
+
+                    -- Set the font that we're going to measure the size of
+                    surface.SetFont("TargetID")
+
+                    -- Get the size of the ailmentText
+                    local textWidth, textHeight = surface.GetTextSize(ailmentText)
+
+                    draw.SimpleText(ailmentText, "TargetID", ailmentXPos, ailmentYPos, textColor)
+                    ailmentXPos = ailmentXPos + textWidth + 5 -- add a small buffer after each ailment
+                end
+            end
+        end
+    end
+end
+
 hook.Add(
     "HUDPaint",
     "StatDisplay",
@@ -76,72 +146,7 @@ hook.Add(
             if inAFight then
                 for i, memberInfo in ipairs(playersInFight) do
                     if IsValid(memberInfo) then
-                        local yPos = yPosition + (i - 1) * yIncrement
-
-                        draw.RoundedBox(4, xPosition, yPos, 190, 60, Color(0, 0, 0, 150))
-
-                        -- Draw each member's information
-                        draw.SimpleText(memberInfo:Name(), "TargetID", xPosition, yPos, textColor)
-                        draw.SimpleText(
-                            "HP: " .. memberInfo:GetNWInt("TBCHP", 100) .. "/" .. memberInfo:GetNWInt("TBCMAXHP", 100),
-                            "TargetID",
-                            xPosition,
-                            yPos + 20,
-                            textColor
-                        )
-                        draw.SimpleText(
-                            "MP: " .. memberInfo:GetNWInt("TBCMP") .. "/" .. memberInfo:GetNWInt("TBCMAXMP", 100),
-                            "TargetID",
-                            xPosition,
-                            yPos + 35,
-                            textColor
-                        )
-
-                        -- Draw ailments
-                        if PlayerStats and PlayerStats[memberInfo:SteamID()] then
-                            local buffs = GetAllStatsClient(memberInfo, "buffs")
-                            local debuffs = GetAllStatsClient(memberInfo, "debuffs")
-
-                            if buffs then
-                                local ailmentXPos = xPosition + 200
-                                local ailmentYPos = yPos + 30
-                                for ailmentName, ailmentInfo in pairs(buffs) do
-                                    if not (ailmentInfo.visibility == 0) then
-                                        local ailmentText =
-                                            string.gsub(ailmentName, "_", " ") .. " " .. ailmentInfo.stacks .. "x"
-
-                                        -- Set the font that we're going to measure the size of
-                                        surface.SetFont("TargetID")
-
-                                        -- Get the size of the ailmentText
-                                        local textWidth, textHeight = surface.GetTextSize(ailmentText)
-
-                                        draw.SimpleText(ailmentText, "TargetID", ailmentXPos, ailmentYPos, textColor)
-                                        ailmentXPos = ailmentXPos + textWidth + 5 -- add a small buffer after each ailment
-                                    end
-                                end
-                            end
-
-                            if debuffs then
-                                local ailmentXPos = xPosition + 200
-                                local ailmentYPos = yPos + 10
-                                for ailmentName, ailmentInfo in pairs(debuffs) do
-                                    if not (ailmentInfo.visibility == 0) then
-                                        local ailmentText =
-                                            string.gsub(ailmentName, "_", " ") .. " " .. ailmentInfo.stacks .. "x"
-
-                                        -- Set the font that we're going to measure the size of
-                                        surface.SetFont("TargetID")
-
-                                        -- Get the size of the ailmentText
-                                        local textWidth, textHeight = surface.GetTextSize(ailmentText)
-
-                                        draw.SimpleText(ailmentText, "TargetID", ailmentXPos, ailmentYPos, textColor)
-                                        ailmentXPos = ailmentXPos + textWidth + 5 -- add a small buffer after each ailment
-                                    end
-                                end
-                            end
-                        end
+                        DrawRosterMemberRow(memberInfo, xPosition, yPosition + (i - 1) * yIncrement, textColor)
                     end
                 end
 
@@ -167,63 +172,21 @@ hook.Add(
                     )
                 end -- Exit if the timer doesn't exist anymore
             else
-                draw.RoundedBox(4, xPosition, yPosition, 190, 60, Color(0, 0, 0, 150))
-                draw.SimpleText(ply:Name(), "TargetID", xPosition, yPosition, textColor)
-                draw.SimpleText(
-                    "HP: " .. ply:GetNWInt("TBCHP") .. "/" .. ply:GetNWInt("TBCMAXHP", 100),
-                    "TargetID",
-                    xPosition,
-                    yPosition + 20,
-                    textColor
-                )
-                draw.SimpleText(
-                    "MP: " .. ply:GetNWInt("TBCMP") .. "/" .. ply:GetNWInt("TBCMAXMP", 100),
-                    "TargetID",
-                    xPosition,
-                    yPosition + 35,
-                    textColor
-                )
+                -- Not in a fight: show the local player's party roster instead,
+                -- falling back to just themselves if they're not in a party.
+                local partyId = IsPlayerInAnyPartyClient and IsPlayerInAnyPartyClient(ply)
+                local partyData = partyId and GetAllPartyDataClient(ply, partyId)
+                local order = partyData and partyData.Order
 
-                -- Draw ailments
-                if PlayerStats and PlayerStats[ply:SteamID()] then
-                    local buffs = GetAllStatsClient(ply, "buffs")
-                    local debuffs = GetAllStatsClient(ply, "debuffs")
-
-                    local ailmentXPos = xPosition + 200
-                    if buffs then
-                        for ailmentName, ailmentInfo in pairs(buffs) do
-                            if not (ailmentInfo.visibility == 0) then
-                                local ailmentText = ailmentName .. " " .. ailmentInfo.stacks .. "x"
-
-                                -- Set the font that we're going to measure the size of
-                                surface.SetFont("TargetID")
-
-                                -- Get the size of the ailmentText
-                                local textWidth, textHeight = surface.GetTextSize(ailmentText)
-
-                                draw.SimpleText(ailmentText, "TargetID", ailmentXPos, yIncrement, textColor)
-                                ailmentXPos = ailmentXPos + textWidth + 5 -- add a small buffer after each ailment
-                            end
+                if order and #order > 0 then
+                    for i, steamID in ipairs(order) do
+                        local memberInfo = partyData.Members[steamID]
+                        if IsValid(memberInfo) then
+                            DrawRosterMemberRow(memberInfo, xPosition, yPosition + (i - 1) * yIncrement, textColor)
                         end
                     end
-
-                    if debuffs then
-                        local ailmentXPos = xPosition + 200
-                        for ailmentName, ailmentInfo in pairs(debuffs) do
-                            if not (ailmentInfo.visibility == 0) then
-                                local ailmentText = ailmentName .. " " .. ailmentInfo.stacks .. "x"
-
-                                -- Set the font that we're going to measure the size of
-                                surface.SetFont("TargetID")
-
-                                -- Get the size of the ailmentText
-                                local textWidth, textHeight = surface.GetTextSize(ailmentText)
-
-                                draw.SimpleText(ailmentText, "TargetID", ailmentXPos, yIncrement + 15, textColor)
-                                ailmentXPos = ailmentXPos + textWidth + 5 -- add a small buffer after each ailment
-                            end
-                        end
-                    end
+                else
+                    DrawRosterMemberRow(ply, xPosition, yPosition, textColor)
                 end
             end
         end

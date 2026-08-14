@@ -330,6 +330,7 @@ function PANEL:Init()
     self.ActiveTab = nil
 
     self:AddTab("Player",     "icon16/user_suit.png")
+    self:AddTab("Party",      "icon16/group_key.png")
     self:AddTab("Inventory",  "icon16/briefcase.png")
     self:AddTab("Characters", "icon16/group.png")
     self:AddTab("Scoreboard", "icon16/user.png")
@@ -392,6 +393,8 @@ function PANEL:SelectTab(tab)
 
     if tab.TabName == "Player" then
         self:LoadPlayerContent()
+    elseif tab.TabName == "Party" then
+        self:LoadPartyContent()
     elseif tab.TabName == "Characters" then
         self:LoadCharactersContent()
     elseif tab.TabName == "Inventory" then
@@ -658,6 +661,334 @@ function PANEL:LoadPlayerContent()
             end
         end
     end
+end
+
+-- ----------------------------------------------------------------
+--  Party tab
+-- ----------------------------------------------------------------
+function PANEL:LoadPartyContent()
+    local ply = LocalPlayer()
+
+    local container = vgui.Create("DPanel", self.Content)
+    container:Dock(FILL)
+    container:DockMargin(20, 20, 20, 20)
+    container.Paint = function() end
+
+    -- Sends a leader-only action (kick/promote/move/disband) to the server.
+    local function SendPartyAction(partyId, action, targetSteamID, newPosition)
+        net.Start("PlayerPartyModify")
+        net.WriteString(partyId)
+        net.WriteString(action)
+        net.WriteString(targetSteamID or "")
+        net.WriteUInt(newPosition or 0, 16)
+        net.SendToServer()
+    end
+
+    -- Opens a player picker used to send a party invite. existingMembers (if given) is the
+    -- current party's Members table, used to hide players who are already in the party.
+    local function OpenInvitePicker(existingMembers)
+        local menu = DermaMenu()
+        local any = false
+
+        for _, target in ipairs(player.GetAll()) do
+            if IsValid(target) and target ~= ply then
+                local alreadyMember = existingMembers and existingMembers[target:SteamID()]
+                if not alreadyMember then
+                    any = true
+                    menu:AddOption(target:Nick(), function()
+                        net.Start("PartyInviteRequest")
+                        net.WriteEntity(target)
+                        net.SendToServer()
+                    end)
+                end
+            end
+        end
+
+        if not any then
+            local opt = menu:AddOption("No players available", function() end)
+            opt:SetEnabled(false)
+        end
+
+        menu:Open()
+    end
+
+    local function BuildUI()
+        if not IsValid(container) then return end
+        container:Clear()
+
+        local partyId = IsPlayerInAnyPartyClient and IsPlayerInAnyPartyClient(ply)
+        local partyData = partyId and GetAllPartyDataClient(ply, partyId) or nil
+
+        if not partyData or not partyData.Members then
+            local header = vgui.Create("DLabel", container)
+            header:Dock(TOP)
+            header:SetFont("DermaLarge")
+            header:SetTextColor(Color(255, 255, 255))
+            header:SetContentAlignment(5)
+            header:DockMargin(0, 0, 0, 10)
+            header:SetAutoStretchVertical(true)
+            header:SetText("Party")
+
+            local info = vgui.Create("DLabel", container)
+            info:Dock(TOP)
+            info:SetText("You are not currently in a party.")
+            info:SetTextColor(Color(180, 180, 180))
+            info:DockMargin(0, 0, 0, 15)
+            info:SetAutoStretchVertical(true)
+
+            local createBtn = vgui.Create("DButton", container)
+            createBtn:Dock(TOP)
+            createBtn:SetTall(36)
+            createBtn:SetWide(180)
+            createBtn:SetContentAlignment(5)
+            createBtn:SetText("Create Party")
+            createBtn.Paint = function(s, w, h)
+                local bg = Color(80, 180, 120, 255)
+                if s:IsHovered() then bg = Color(100, 200, 140, 255) end
+                draw.RoundedBox(6, 0, 0, w, h, bg)
+            end
+            createBtn.DoClick = function()
+                RunConsoleCommand("partycreate")
+            end
+
+            local inviteBtn = vgui.Create("DButton", container)
+            inviteBtn:Dock(TOP)
+            inviteBtn:SetTall(36)
+            inviteBtn:SetWide(180)
+            inviteBtn:DockMargin(0, 8, 0, 0)
+            inviteBtn:SetContentAlignment(5)
+            inviteBtn:SetText("Invite Player")
+            inviteBtn.Paint = function(s, w, h)
+                local bg = Color(80, 120, 180, 255)
+                if s:IsHovered() then bg = Color(100, 140, 200, 255) end
+                draw.RoundedBox(6, 0, 0, w, h, bg)
+            end
+            inviteBtn.DoClick = function()
+                OpenInvitePicker(nil)
+            end
+
+            return
+        end
+
+        local isLeader = partyData.PartyLead == ply:SteamID()
+        local order = partyData.Order or {}
+        local partyName = partyData.PartyName or "Party"
+
+        if isLeader then
+            local header = vgui.Create("DButton", container)
+            header:Dock(TOP)
+            header:SetTall(28)
+            header:DockMargin(0, 0, 0, 10)
+            header:SetText("")
+            header:SetCursor("hand")
+            header:SetTooltip("Click to rename your party")
+            header.Paint = function(s, w, h)
+                draw.SimpleText(partyName, "DermaLarge", w / 2, h / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            end
+            header.DoClick = function()
+                Derma_StringRequest(
+                    "Rename Party",
+                    "Enter a new party name:",
+                    partyName,
+                    function(newName)
+                        SendPartyAction(partyId, "rename", newName)
+                    end,
+                    function() end,
+                    "Rename",
+                    "Cancel"
+                )
+            end
+        else
+            local header = vgui.Create("DLabel", container)
+            header:Dock(TOP)
+            header:SetFont("DermaLarge")
+            header:SetTextColor(Color(255, 255, 255))
+            header:SetContentAlignment(5)
+            header:DockMargin(0, 0, 0, 10)
+            header:SetText(partyName)
+        end
+
+        local scroll = vgui.Create("DScrollPanel", container)
+        scroll:Dock(FILL)
+        scroll:DockMargin(0, 0, 0, 10)
+
+        local ROW_H = 60
+
+        for placement, steamID in ipairs(order) do
+            local member = partyData.Members[steamID]
+            local isSelf = IsValid(member) and member == ply
+
+            local row = vgui.Create("DPanel", scroll)
+            row:Dock(TOP)
+            row:SetTall(ROW_H)
+            row:DockMargin(0, 3, 0, 3)
+            row.Paint = function(s, w, h)
+                local bg = isSelf and Color(55, 65, 80, 220) or Color(45, 45, 45, 200)
+                draw.RoundedBox(4, 0, 0, w, h, bg)
+            end
+
+            local placementLbl = vgui.Create("DLabel", row)
+            placementLbl:Dock(LEFT)
+            placementLbl:SetWide(36)
+            placementLbl:SetText("#" .. placement)
+            placementLbl:SetFont("DermaDefaultBold")
+            placementLbl:SetTextColor(Color(180, 180, 180))
+            placementLbl:SetContentAlignment(5)
+
+            if isLeader then
+                local gearBtn = vgui.Create("DButton", row)
+                gearBtn:Dock(RIGHT)
+                gearBtn:SetWide(ROW_H)
+                gearBtn:DockMargin(4, 4, 4, 4)
+                gearBtn:SetText("")
+
+                local gearIcon = Material("icon16/cog.png")
+                gearBtn.Paint = function(s, w, h)
+                    local bg = Color(60, 60, 60, 255)
+                    if s:IsHovered() then bg = Color(80, 80, 80, 255) end
+                    draw.RoundedBox(4, 0, 0, w, h, bg)
+                    surface.SetDrawColor(255, 255, 255, 255)
+                    surface.SetMaterial(gearIcon)
+                    surface.DrawTexturedRect(w / 2 - 8, h / 2 - 8, 16, 16)
+                end
+
+                gearBtn.DoClick = function()
+                    local menu = DermaMenu()
+
+                    local moveMenu = menu:AddSubMenu("Move To Placement")
+                    moveMenu:SetDeleteSelf(true)
+                    for pos = 1, #order do
+                        if pos ~= placement then
+                            moveMenu:AddOption("Placement #" .. pos, function()
+                                SendPartyAction(partyId, "move", steamID, pos)
+                            end)
+                        end
+                    end
+
+                    if not isSelf then
+                        menu:AddOption("Make Party Leader", function()
+                            SendPartyAction(partyId, "promote", steamID)
+                        end)
+
+                        menu:AddOption("Kick From Party", function()
+                            SendPartyAction(partyId, "kick", steamID)
+                        end)
+                    end
+
+                    menu:Open()
+                end
+            end
+
+            if IsValid(member) then
+                local avatarWrap = vgui.Create("DPanel", row)
+                avatarWrap:Dock(LEFT)
+                avatarWrap:SetWide(ROW_H)
+                avatarWrap.Paint = function() end
+
+                local avatar = vgui.Create("AvatarImage", avatarWrap)
+                avatar:SetSize(ROW_H - 8, ROW_H - 8)
+                avatar:SetPos(4, 4)
+                avatar:SetPlayer(member, 64)
+
+                local modelWrap = vgui.Create("DPanel", row)
+                modelWrap:Dock(LEFT)
+                modelWrap:SetWide(ROW_H)
+                modelWrap.Paint = function() end
+
+                local modelIcon = vgui.Create("SpawnIcon", modelWrap)
+                modelIcon:SetSize(ROW_H - 8, ROW_H - 8)
+                modelIcon:SetPos(4, 4)
+                modelIcon:SetModel(member:GetModel() or "models/player/group01/male_01.mdl")
+                modelIcon:SetMouseInputEnabled(false)
+                modelIcon:SetKeyboardInputEnabled(false)
+                modelIcon:SetTooltip(false)
+
+                local nameLbl = vgui.Create("DLabel", row)
+                nameLbl:Dock(FILL)
+                nameLbl:DockMargin(10, 0, 5, 0)
+                local nameText = member:Nick()
+                if partyData.PartyLead == steamID then
+                    nameText = nameText .. "  (Leader)"
+                end
+                nameLbl:SetText(nameText)
+                nameLbl:SetFont("DermaDefaultBold")
+                nameLbl:SetTextColor(partyData.PartyLead == steamID and Color(255, 215, 0) or Color(230, 230, 230))
+                nameLbl:SetContentAlignment(4)
+            else
+                local nameLbl = vgui.Create("DLabel", row)
+                nameLbl:Dock(FILL)
+                nameLbl:DockMargin(10, 0, 5, 0)
+                nameLbl:SetText("Unknown / Offline")
+                nameLbl:SetFont("DermaDefault")
+                nameLbl:SetTextColor(Color(140, 140, 140))
+                nameLbl:SetContentAlignment(4)
+            end
+        end
+
+        local footer = vgui.Create("DPanel", container)
+        footer:Dock(BOTTOM)
+        footer:SetTall(46)
+        footer:DockMargin(0, 10, 0, 0)
+        footer.Paint = function() end
+
+        if isLeader then
+            local inviteBtn = vgui.Create("DButton", footer)
+            inviteBtn:Dock(LEFT)
+            inviteBtn:SetWide(140)
+            inviteBtn:SetText("Invite Player")
+            inviteBtn.Paint = function(s, w, h)
+                local bg = Color(70, 110, 170, 255)
+                if s:IsHovered() then bg = Color(90, 130, 190, 255) end
+                draw.RoundedBox(6, 0, 0, w, h, bg)
+            end
+            inviteBtn.DoClick = function()
+                OpenInvitePicker(partyData.Members)
+            end
+
+            local disbandBtn = vgui.Create("DButton", footer)
+            disbandBtn:Dock(RIGHT)
+            disbandBtn:SetWide(160)
+            disbandBtn:SetText("Disband Party")
+            disbandBtn.Paint = function(s, w, h)
+                local bg = Color(180, 70, 70, 255)
+                if s:IsHovered() then bg = Color(200, 90, 90, 255) end
+                draw.RoundedBox(6, 0, 0, w, h, bg)
+            end
+            disbandBtn.DoClick = function()
+                Derma_Query(
+                    "Are you sure you want to disband the party?",
+                    "Disband Party",
+                    "Yes", function() SendPartyAction(partyId, "disband") end,
+                    "No", function() end
+                )
+            end
+        else
+            local leaveBtn = vgui.Create("DButton", footer)
+            leaveBtn:Dock(RIGHT)
+            leaveBtn:SetWide(140)
+            leaveBtn:SetText("Leave Party")
+            leaveBtn.Paint = function(s, w, h)
+                local bg = Color(120, 60, 60, 255)
+                if s:IsHovered() then bg = Color(140, 80, 80, 255) end
+                draw.RoundedBox(6, 0, 0, w, h, bg)
+            end
+            leaveBtn.DoClick = function()
+                RunConsoleCommand("partyleave")
+            end
+        end
+    end
+
+    -- Keep the tab live as party data changes (created/joined/kicked/reordered/disbanded)
+    local hookKey = "TabMenu_PartyRefresh_" .. tostring(self)
+    hook.Add("TBC_PartyDataUpdated", hookKey, BuildUI)
+
+    local origRemove = self.OnRemove
+    self.OnRemove = function(s)
+        hook.Remove("TBC_PartyDataUpdated", hookKey)
+        if origRemove then origRemove(s) end
+    end
+
+    BuildUI()
 end
 
 -- ----------------------------------------------------------------
@@ -1751,12 +2082,12 @@ vgui.Register("CustomTabMenu", PANEL, "DFrame")
 -- ================================================================
 hook.Add(
     "PlayerButtonDown",
-    "OpenCustomTabMenuF2",
+    "OpenCustomTabMenuF4",
     function(ply, button)
         if ply ~= LocalPlayer() then return end
         if not IsFirstTimePredicted() then return end
 
-        if button == KEY_F2 then
+        if button == KEY_F4 then
             if not IsValid(TabMenu) then
                 TabMenu = vgui.Create("CustomTabMenu")
             end

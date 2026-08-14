@@ -95,6 +95,16 @@ function SWEP:PrimaryAttack()
 
     if tr.Hit and CheckIfValidTBCEntity(tr.Entity) then
         local target = tr.Entity
+
+        if target:IsPlayer() then
+            local plyParty = IsPlayerInAnyParty(ply)
+            if plyParty and plyParty == IsPlayerInAnyParty(target) then
+                ply:ChatPrint("You can't engage a member of your own party.")
+                ply:LagCompensation(false)
+                return
+            end
+        end
+
         local hasEngageSWEP = false
         local targetEngageSWEP
         for _, weapon in ipairs(target:GetWeapons()) do

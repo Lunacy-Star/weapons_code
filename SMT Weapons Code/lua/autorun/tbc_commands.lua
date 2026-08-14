@@ -20,6 +20,129 @@ if SERVER then
         RemoveFromParty(ply, partyId)
     end)
 
+    -- Finds a connected player (other than ply) whose name contains nameQuery,
+    -- case-insensitively. Returns the player, or nil plus a feedback message.
+    local function FindPlayerByPartialName(ply, nameQuery)
+        local lowerQuery = string.lower(nameQuery)
+        local found, multipleMatches
+
+        for _, target in ipairs(player.GetAll()) do
+            if target ~= ply and string.find(string.lower(target:Name()), lowerQuery, 1, true) then
+                if found then
+                    multipleMatches = true
+                else
+                    found = target
+                end
+            end
+        end
+
+        if not found then
+            return nil, "No player found matching \"" .. nameQuery .. "\"."
+        end
+        if multipleMatches then
+            return nil, "Multiple players match \"" .. nameQuery .. "\" - please be more specific."
+        end
+        return found
+    end
+
+    hook.Add("PlayerSay", "PartyInviteChatCommand", function(ply, text)
+        local cmd = string.lower(text)
+        if string.sub(cmd, 1, 13) ~= "/partyinvite " then
+            return
+        end
+
+        local targetName = string.Trim(string.sub(text, 14))
+        if targetName == "" then
+            ply:ChatPrint("Usage: /partyinvite <name>")
+            return ""
+        end
+
+        local target, err = FindPlayerByPartialName(ply, targetName)
+        if not target then
+            ply:ChatPrint(err)
+            return ""
+        end
+
+        local success, message = InvitePlayerToParty(ply, target)
+        if message then
+            ply:ChatPrint(message)
+        end
+
+        return ""
+    end)
+
+    -- Admin-only: forces a player into the admin's own party, creating one
+    -- for the admin first if they don't already have one.
+    hook.Add("PlayerSay", "PartyForceChatCommand", function(ply, text)
+        local cmd = string.lower(text)
+        if string.sub(cmd, 1, 12) ~= "/partyforce " then
+            return
+        end
+
+        if not ply:IsAdmin() then
+            ply:ChatPrint("You do not have permission to use this command.")
+            return ""
+        end
+
+        local targetName = string.Trim(string.sub(text, 13))
+        if targetName == "" then
+            ply:ChatPrint("Usage: /partyforce <name>")
+            return ""
+        end
+
+        local target, err = FindPlayerByPartialName(ply, targetName)
+        if not target then
+            ply:ChatPrint(err)
+            return ""
+        end
+
+        local partyId = IsPlayerInAnyParty(ply)
+        if not partyId then
+            partyId = CreateParty(ply)
+        end
+
+        AssignParty(target, partyId)
+        ply:ChatPrint("Forced " .. target:Nick() .. " into your party.")
+
+        return ""
+    end)
+
+    -- Admin-only: strips a player from whatever party they're currently in,
+    -- regardless of who leads it.
+    hook.Add("PlayerSay", "PartyStripChatCommand", function(ply, text)
+        local cmd = string.lower(text)
+        if string.sub(cmd, 1, 12) ~= "/partystrip " then
+            return
+        end
+
+        if not ply:IsAdmin() then
+            ply:ChatPrint("You do not have permission to use this command.")
+            return ""
+        end
+
+        local targetName = string.Trim(string.sub(text, 13))
+        if targetName == "" then
+            ply:ChatPrint("Usage: /partystrip <name>")
+            return ""
+        end
+
+        local target, err = FindPlayerByPartialName(ply, targetName)
+        if not target then
+            ply:ChatPrint(err)
+            return ""
+        end
+
+        if not IsPlayerInAnyParty(target) then
+            ply:ChatPrint(target:Nick() .. " isn't in a party.")
+            return ""
+        end
+
+        AdminRemoveFromParty(ply, target)
+        ply:ChatPrint("Removed " .. target:Nick() .. " from their party.")
+
+        return ""
+    end)
+
     concommand.Add("useturn", function(ply, cmd, args)
         -- Validate if the player is in a fight
         local engageWeapon = ply:GetWeapon("smti_engageswep")

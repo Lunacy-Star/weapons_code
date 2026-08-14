@@ -14,6 +14,7 @@ util.AddNetworkString("DropPersona")
 util.AddNetworkString("ChangeProfession")
 util.AddNetworkString("RequestProfessionData")
 util.AddNetworkString("SyncProfession")
+util.AddNetworkString("PartyInviteRequest")
 
 SMT_PROFESSIONS = {
     "Cooking",
@@ -330,6 +331,52 @@ net.Receive(
             TBC_PlaceEntity(ent, tr, player)
 
             RemoveStat(player, ent.BuffRegistration, ent.BuffType)
+        end
+    end
+)
+
+-- ============================================================
+-- Party management (leader actions triggered from the Party tab)
+-- ============================================================
+net.Receive(
+    "PlayerPartyModify",
+    function(len, player)
+        if not IsValid(player) or not player:IsPlayer() then
+            return
+        end
+
+        local partyId = net.ReadString()
+        local action = net.ReadString()
+        -- For "rename" this field carries the new party name instead of a SteamID.
+        local targetSteamID = net.ReadString()
+        local newPosition = net.ReadUInt(16)
+
+        if action == "kick" then
+            KickFromParty(player, partyId, targetSteamID)
+        elseif action == "promote" then
+            SetPartyLeader(player, partyId, targetSteamID)
+        elseif action == "move" then
+            MovePartyMember(player, partyId, targetSteamID, newPosition)
+        elseif action == "disband" then
+            DisbandParty(player, partyId)
+        elseif action == "rename" then
+            RenameParty(player, partyId, targetSteamID)
+        end
+    end
+)
+
+net.Receive(
+    "PartyInviteRequest",
+    function(len, player)
+        if not IsValid(player) or not player:IsPlayer() then
+            return
+        end
+
+        local target = net.ReadEntity()
+
+        local success, message = InvitePlayerToParty(player, target)
+        if message then
+            player:ChatPrint(message)
         end
     end
 )
