@@ -808,6 +808,17 @@ function PANEL:LoadPartyContent()
             header:SetText(partyName)
         end
 
+        local kdLimit = GetPartyKilodevilLimit and GetPartyKilodevilLimit() or 500
+        local kdTotal = partyData.TotalKilodevil or 0
+
+        local kdLabel = vgui.Create("DLabel", container)
+        kdLabel:Dock(TOP)
+        kdLabel:SetFont("DermaDefault")
+        kdLabel:SetContentAlignment(5)
+        kdLabel:DockMargin(0, 0, 0, 10)
+        kdLabel:SetText("Kilodevil: " .. kdTotal .. " / " .. kdLimit)
+        kdLabel:SetTextColor(kdTotal > kdLimit and Color(220, 100, 100) or Color(160, 160, 160))
+
         local scroll = vgui.Create("DScrollPanel", container)
         scroll:Dock(FILL)
         scroll:DockMargin(0, 0, 0, 10)
@@ -1035,35 +1046,36 @@ function PANEL:LoadInventoryContent()
         draw.RoundedBox(6, 0, 0, w, h, bgColor)
     end
 
-    -- ---- Equipment ----
-    equipmentPanel.Paint = function(s, w, h) draw.RoundedBox(6, 0, 0, w, h, bgColor) end
+    -- DGrid sizes itself to fit its items (PerformLayout calls SetWide/SetTall
+    -- based on item count -- see lua/vgui/dgrid.lua), which fights Dock(FILL):
+    -- with few items the grid collapses to a small box instead of filling the
+    -- tab. The working pattern elsewhere in this codebase (dialogue_entity's
+    -- cl_storage_ui.lua) is to dock a DScrollPanel FILL and let the DGrid
+    -- self-size inside it, uncontested.
+    local function MakeGridTab(panel)
+        panel.Paint = function(s, w, h) draw.RoundedBox(6, 0, 0, w, h, bgColor) end
 
-    local equipmentGrid = vgui.Create("DGrid", equipmentPanel)
-    equipmentGrid:Dock(FILL)
-    equipmentGrid:SetCols(10)
-    equipmentGrid:SetColWide(64)
-    equipmentGrid:SetRowHeight(64)
-    equipmentGrid.Paint = GridPaint
+        local scroll = vgui.Create("DScrollPanel", panel)
+        scroll:Dock(FILL)
+
+        local grid = vgui.Create("DGrid", scroll)
+        grid:SetCols(10)
+        grid:SetColWide(64)
+        grid:SetRowHeight(64)
+        grid:SetWide(10 * 64)
+        grid.Paint = GridPaint
+
+        return grid
+    end
+
+    -- ---- Equipment ----
+    local equipmentGrid = MakeGridTab(equipmentPanel)
 
     -- ---- Items ----
-    itemsPanel.Paint = function(s, w, h) draw.RoundedBox(6, 0, 0, w, h, bgColor) end
-
-    local itemGrid = vgui.Create("DGrid", itemsPanel)
-    itemGrid:Dock(FILL)
-    itemGrid:SetCols(10)
-    itemGrid:SetColWide(64)
-    itemGrid:SetRowHeight(64)
-    itemGrid.Paint = GridPaint
+    local itemGrid = MakeGridTab(itemsPanel)
 
     -- ---- Personas ----
-    personasPanel.Paint = function(s, w, h) draw.RoundedBox(6, 0, 0, w, h, bgColor) end
-
-    local personasGrid = vgui.Create("DGrid", personasPanel)
-    personasGrid:Dock(FILL)
-    personasGrid:SetCols(10)
-    personasGrid:SetColWide(64)
-    personasGrid:SetRowHeight(64)
-    personasGrid.Paint = GridPaint
+    local personasGrid = MakeGridTab(personasPanel)
 
     -- ---- Resources ---- (NEW)
     resourcesPanel.Paint = function(s, w, h) draw.RoundedBox(6, 0, 0, w, h, bgColor) end
@@ -1405,62 +1417,61 @@ function PANEL:LoadInventoryContent()
                 btn:SetImage(personaData.image)
                 btn:SetTooltip(personaData.name)
 
-            if personaName == ply:GetNW2String("selectedPersona", "") then
-                btn.PaintOver = function(s, w, h)
-                    surface.SetDrawColor(Color(0, 0, 255))
-                    surface.DrawOutlinedRect(0, 0, w, h)
-                end
-            end
-
-            btn.DoClick = function()
-                OpenPersonaDetailWindow(anchorPanel, personaName)
-            end
-
-            btn.DoRightClick = function()
-                local menu = DermaMenu()
-
-                if ply:GetNW2String("selectedPersona", "") == personaName then
-                    menu:AddOption("Unequip", function()
-                        net.Start("DropPersona")
-                        net.WriteString(personaName)
-                        net.WriteBool(false)
-                        net.SendToServer()
-                        timer.Create("TBC_InvRefresh", 0.1, 1, function()
-                            updatePersonaItems()
-                            updateEquippedItems()
-                        end)
-                    end)
-                else
-                    menu:AddOption("Equip", function()
-                        net.Start("EquipPersona")
-                        net.WriteString(personaName)
-                        net.SendToServer()
-                        timer.Create("TBC_InvRefresh", 0.1, 1, function()
-                            updatePersonaItems()
-                            updateEquippedItems()
-                        end)
-                    end)
+                if personaName == ply:GetNW2String("selectedPersona", "") then
+                    btn.PaintOver = function(s, w, h)
+                        surface.SetDrawColor(Color(0, 0, 255))
+                        surface.DrawOutlinedRect(0, 0, w, h)
+                    end
                 end
 
-                if personaDroppable then
-                    menu:AddOption("Drop", function()
-                        net.Start("DropPersona")
-                        net.WriteString(personaName)
-                        net.WriteBool(true)
-                        net.SendToServer()
-                        timer.Create("TBC_InvRefresh", 0.1, 1, function()
-                            updatePersonaItems()
-                            updateEquippedItems()
-                        end)
-                    end)
+                btn.DoClick = function()
+                    OpenPersonaDetailWindow(anchorPanel, personaName)
                 end
 
-                menu:Open()
-            end
+                btn.DoRightClick = function()
+                    local menu = DermaMenu()
 
-            end
+                    if ply:GetNW2String("selectedPersona", "") == personaName then
+                        menu:AddOption("Unequip", function()
+                            net.Start("DropPersona")
+                            net.WriteString(personaName)
+                            net.WriteBool(false)
+                            net.SendToServer()
+                            timer.Create("TBC_InvRefresh", 0.1, 1, function()
+                                updatePersonaItems()
+                                updateEquippedItems()
+                            end)
+                        end)
+                    else
+                        menu:AddOption("Equip", function()
+                            net.Start("EquipPersona")
+                            net.WriteString(personaName)
+                            net.SendToServer()
+                            timer.Create("TBC_InvRefresh", 0.1, 1, function()
+                                updatePersonaItems()
+                                updateEquippedItems()
+                            end)
+                        end)
+                    end
 
-            personasGrid:AddItem(btn)
+                    if personaDroppable then
+                        menu:AddOption("Drop", function()
+                            net.Start("DropPersona")
+                            net.WriteString(personaName)
+                            net.WriteBool(true)
+                            net.SendToServer()
+                            timer.Create("TBC_InvRefresh", 0.1, 1, function()
+                                updatePersonaItems()
+                                updateEquippedItems()
+                            end)
+                        end)
+                    end
+
+                    menu:Open()
+                end
+
+                personasGrid:AddItem(btn)
+            end
         end
     end
 
@@ -1561,11 +1572,44 @@ function PANEL:CreateCategoryPanel(parent, category)
 
     local hasCharacters = false
     if CHARACTERS and CHARACTERS.List then
+        -- Characters that share a variantGroup (e.g. student_a/student_b) get a single
+        -- tile that opens a variant comparison screen instead of being listed as fully
+        -- separate characters.
+        local groups = {}
+        local groupOrder = {}
+        local standalone = {}
+
         for charID, char in pairs(CHARACTERS.List) do
             if char.category == category.name then
-                self:CreateCharacterButton(content, char, charID)
-                hasCharacters = true
+                if char.variantGroup then
+                    if not groups[char.variantGroup] then
+                        groups[char.variantGroup] = {}
+                        table.insert(groupOrder, char.variantGroup)
+                    end
+                    table.insert(groups[char.variantGroup], {charID = charID, char = char})
+                else
+                    table.insert(standalone, {charID = charID, char = char})
+                end
             end
+        end
+
+        for _, entry in ipairs(standalone) do
+            self:CreateCharacterButton(content, entry.char, entry.charID)
+            hasCharacters = true
+        end
+
+        for _, groupKey in ipairs(groupOrder) do
+            local variants = groups[groupKey]
+            if #variants == 1 then
+                self:CreateCharacterButton(content, variants[1].char, variants[1].charID)
+            else
+                table.sort(variants, function(a, b)
+                    return (a.char.variantLabel or a.charID) < (b.char.variantLabel or b.charID)
+                end)
+                local groupName = variants[1].char.variantGroupName or variants[1].char.name
+                self:CreateVariantGroupButton(content, groupName, variants)
+            end
+            hasCharacters = true
         end
     end
 
@@ -1610,6 +1654,403 @@ function PANEL:CreateCharacterButton(parent, character, charID)
     iconPanel:SetTooltip(false)
 
     return charButton
+end
+
+-- ----------------------------------------------------------------
+--  Variant group tile: shared entry point for characters that come
+--  in multiple variants (e.g. Student A/B, Jack Frost A/B).
+-- ----------------------------------------------------------------
+function PANEL:CreateVariantGroupButton(parent, groupName, variants)
+    local charButton = vgui.Create("DButton", parent)
+    charButton:Dock(TOP)
+    charButton:SetTall(70)
+    charButton:DockMargin(5, 5, 5, 0)
+    charButton:SetText("")
+
+    local modelPath = (variants[1].char.model and variants[1].char.model[1]) or "models/player/group01/male_01.mdl"
+
+    charButton.Paint = function(s, w, h)
+        local bgColor = Color(80, 80, 80, 200)
+        if s:IsHovered() then bgColor = Color(100, 100, 100, 200) end
+        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+        draw.SimpleText(groupName, "DermaDefault", 75, h / 2 - 8, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText(#variants .. " Variants", "DermaDefault", 75, h / 2 + 10, Color(180, 180, 180), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    end
+
+    charButton.DoClick = function()
+        self:ShowVariantGroup(groupName, variants)
+    end
+
+    local iconPanel = vgui.Create("SpawnIcon", charButton)
+    iconPanel:SetPos(5, 5)
+    iconPanel:SetSize(60, 60)
+    iconPanel:SetModel(modelPath)
+    iconPanel:SetMouseInputEnabled(false)
+    iconPanel:SetKeyboardInputEnabled(false)
+    iconPanel:SetTooltip(false)
+
+    return charButton
+end
+
+-- ----------------------------------------------------------------
+--  Variant screen: shows one variant's full description and stats at a
+--  time, with back/forward arrows to cycle between them. Variants share
+--  one model list, so the model viewer + selector sit once at the bottom.
+--  Picking "Select Character" applies whichever variant is on screen;
+--  the existing loadout/persona menu then opens automatically on
+--  respawn exactly as it always has.
+-- ----------------------------------------------------------------
+function PANEL:ShowVariantGroup(groupName, variants, startIndex, selectedModel)
+    if not IsValid(self.CharacterDetail) then return end
+    self.CharacterDetail:Clear()
+
+    local ply = LocalPlayer()
+
+    local index = startIndex
+    if not index then
+        index = 1
+        local assigned = ply:GetNWString("AssignedCharacter", "")
+        for i, entry in ipairs(variants) do
+            if entry.charID == assigned then
+                index = i
+                break
+            end
+        end
+    end
+    if index < 1 then index = #variants end
+    if index > #variants then index = 1 end
+
+    local entry = variants[index]
+    local character, charID = entry.char, entry.charID
+
+    local currentModel = selectedModel
+    if not currentModel and ply:GetNWString("AssignedCharacter", "") == charID then
+        currentModel = ply:GetModel()
+    end
+    local validModel = false
+    if character.model then
+        for _, m in ipairs(character.model) do
+            if m == currentModel then
+                validModel = true
+                break
+            end
+        end
+    end
+    if not validModel then
+        currentModel = (character.model and character.model[1]) or "models/player/group01/male_01.mdl"
+    end
+
+    -- ---- Header: back arrow / variant title / forward arrow ----
+    local headerRow = vgui.Create("DPanel", self.CharacterDetail)
+    headerRow:Dock(TOP)
+    headerRow:SetTall(40)
+    headerRow:DockMargin(10, 10, 10, 0)
+    headerRow.Paint = function() end
+
+    local backBtn = vgui.Create("DButton", headerRow)
+    backBtn:Dock(LEFT)
+    backBtn:SetWide(40)
+    backBtn:SetText("<")
+    backBtn:SetFont("DermaLarge")
+    backBtn:SetEnabled(#variants > 1)
+    backBtn.DoClick = function()
+        self:ShowVariantGroup(groupName, variants, index - 1, currentModel)
+    end
+
+    local nextBtn = vgui.Create("DButton", headerRow)
+    nextBtn:Dock(RIGHT)
+    nextBtn:SetWide(40)
+    nextBtn:SetText(">")
+    nextBtn:SetFont("DermaLarge")
+    nextBtn:SetEnabled(#variants > 1)
+    nextBtn.DoClick = function()
+        self:ShowVariantGroup(groupName, variants, index + 1, currentModel)
+    end
+
+    local titleLabel = vgui.Create("DLabel", headerRow)
+    titleLabel:Dock(FILL)
+    local titleText = groupName
+    if character.variantLabel then
+        titleText = titleText .. " - " .. character.variantLabel
+    end
+    if #variants > 1 then
+        titleText = titleText .. "  (" .. index .. "/" .. #variants .. ")"
+    end
+    titleLabel:SetText(titleText)
+    titleLabel:SetFont("DermaLarge")
+    titleLabel:SetTextColor(Color(255, 255, 255))
+    titleLabel:SetContentAlignment(5)
+
+    -- ---- Body: description/stats/etc, then the shared model section ----
+    local scroll = vgui.Create("DScrollPanel", self.CharacterDetail)
+    scroll:Dock(FILL)
+    scroll:DockMargin(10, 10, 10, 10)
+
+    local separator = vgui.Create("DPanel", scroll)
+    separator:Dock(TOP)
+    separator:SetTall(2)
+    separator:DockMargin(0, 0, 0, 8)
+    separator.Paint = function(s, w, h)
+        draw.RoundedBox(0, 0, 0, w, h, Color(100, 100, 100, 200))
+    end
+
+    local function SectionHeader(text)
+        local lbl = vgui.Create("DLabel", scroll)
+        lbl:Dock(TOP)
+        lbl:SetText(text)
+        lbl:SetFont("DermaDefaultBold")
+        lbl:SetTextColor(Color(200, 200, 200))
+        lbl:DockMargin(0, 0, 0, 4)
+        return lbl
+    end
+
+    local function SectionBody(text)
+        local lbl = vgui.Create("DLabel", scroll)
+        lbl:Dock(TOP)
+        lbl:SetText(text)
+        lbl:SetTextColor(Color(220, 220, 220))
+        lbl:SetAutoStretchVertical(true)
+        lbl:SetWrap(true)
+        lbl:DockMargin(0, 0, 0, 12)
+        return lbl
+    end
+
+    SectionHeader("Description:")
+    SectionBody(character.description or "No description available.")
+
+    local stats = {}
+    if character.combatHP      and character.combatHP      > 0 then table.insert(stats, "HP: "              .. character.combatHP)      end
+    if character.combatMP      and character.combatMP      > 0 then table.insert(stats, "MP: "              .. character.combatMP)      end
+    if character.Luck          and character.Luck          > 0 then table.insert(stats, "Luck: "            .. character.Luck)          end
+    if character.Technique     and character.Technique     > 0 then table.insert(stats, "Technique: "       .. character.Technique)     end
+    if character.essence       and character.essence       > 0 then table.insert(stats, "Essence: "         .. character.essence)       end
+    if character.kilodevil     and character.kilodevil     > 0 then table.insert(stats, "Kilodevil: "       .. character.kilodevil)     end
+    if character.equipmentSlots and character.equipmentSlots > 0 then table.insert(stats, "Equipment Slots: " .. character.equipmentSlots) end
+    if character.itemSlots     and character.itemSlots     > 0 then table.insert(stats, "Item Slots: "      .. character.itemSlots)     end
+    if character.turns         and character.turns         > 0 then table.insert(stats, "Turns: "           .. character.turns)         end
+
+    if #stats > 0 then
+        SectionHeader("Stats:")
+        SectionBody(table.concat(stats, "\n"))
+    end
+
+    local hasResistInfo =
+        (character.resist and #character.resist > 0) or
+        (character.weak   and #character.weak   > 0) or
+        (character.block  and #character.block  > 0) or
+        (character.drain  and #character.drain  > 0) or
+        (character.repel  and #character.repel  > 0)
+
+    if hasResistInfo then
+        local resistInfo = {}
+        if character.weak   and #character.weak   > 0 then table.insert(resistInfo, "Weak: "   .. table.concat(character.weak,   ", ")) end
+        if character.resist and #character.resist > 0 then table.insert(resistInfo, "Resist: " .. table.concat(character.resist, ", ")) end
+        if character.block  and #character.block  > 0 then table.insert(resistInfo, "Block: "  .. table.concat(character.block,  ", ")) end
+        if character.drain  and #character.drain  > 0 then table.insert(resistInfo, "Drain: "  .. table.concat(character.drain,  ", ")) end
+        if character.repel  and #character.repel  > 0 then table.insert(resistInfo, "Repel: "  .. table.concat(character.repel,  ", ")) end
+
+        SectionHeader("Resistances & Weaknesses:")
+        SectionBody(table.concat(resistInfo, "\n"))
+    end
+
+    if character.weapons and #character.weapons > 0 then
+        local weaponNames = {}
+        for _, weaponClass in ipairs(character.weapons) do
+            local wepData     = weapons and weapons.Get and weapons.Get(weaponClass)
+            local passiveData = not wepData and Passives and Passives[weaponClass]
+            if type(passiveData) ~= "table" then passiveData = nil end
+
+            if passiveData then
+                table.insert(weaponNames, passiveData.name .. " (Passive)")
+            elseif wepData then
+                table.insert(weaponNames, wepData.PrintName or weaponClass)
+            else
+                table.insert(weaponNames, weaponClass)
+            end
+        end
+        SectionHeader("Weapons & Skills:")
+        SectionBody(table.concat(weaponNames, "\n"))
+    end
+
+    if character.loadoutItems and #character.loadoutItems > 0 then
+        local loadoutNames = {}
+        for _, itemClass in ipairs(character.loadoutItems) do
+            local n = itemClass
+            if LoadoutItems and LoadoutItems[itemClass] then
+                n = LoadoutItems[itemClass].name
+            elseif Personas and Personas[itemClass] then
+                n = Personas[itemClass].name
+            end
+            if n then table.insert(loadoutNames, n) end
+        end
+        SectionHeader("Loadout Items:")
+        SectionBody(table.concat(loadoutNames, "\n"))
+    end
+
+    if character.permaBuffs and table.Count(character.permaBuffs) > 0 then
+        local names = {}
+        for buffName, _ in pairs(character.permaBuffs) do table.insert(names, buffName) end
+        SectionHeader("Permanent Passives:")
+        SectionBody(table.concat(names, "\n"))
+    end
+
+    -- ---- Shared model viewer + selector (same for every variant) ----
+    if character.model and #character.model > 0 then
+        local spacer = vgui.Create("DPanel", scroll)
+        spacer:Dock(TOP)
+        spacer:SetTall(10)
+        spacer.Paint = function() end
+
+        local modelHeader = vgui.Create("DLabel", scroll)
+        modelHeader:Dock(TOP)
+        modelHeader:SetText("Character Model:")
+        modelHeader:SetFont("DermaDefaultBold")
+        modelHeader:SetTextColor(Color(200, 200, 200))
+        modelHeader:DockMargin(0, 0, 0, 5)
+
+        local modelViewerPanel = vgui.Create("DPanel", scroll)
+        modelViewerPanel:Dock(TOP)
+        modelViewerPanel:SetTall(400)
+        modelViewerPanel:DockMargin(5, 5, 5, 5)
+        modelViewerPanel.Paint = function(s, w, h)
+            draw.RoundedBox(4, 0, 0, w, h, Color(40, 40, 40, 200))
+        end
+
+        local modelViewer = vgui.Create("DModelPanel", modelViewerPanel)
+        modelViewer:Dock(FILL)
+        modelViewer:SetModel(currentModel)
+        modelViewer:SetFOV(90)
+        modelViewer:SetCamPos(Vector(50, 0, 50))
+        modelViewer:SetLookAt(Vector(0, 0, 40))
+        function modelViewer:LayoutEntity(ent)
+            ent:SetSequence(ent:LookupSequence("idle_all_01") or 0)
+            self:RunAnimation()
+        end
+
+        local selectorLabel = vgui.Create("DLabel", scroll)
+        selectorLabel:Dock(TOP)
+        selectorLabel:SetText("Available Models:")
+        selectorLabel:SetFont("DermaDefaultBold")
+        selectorLabel:SetTextColor(Color(200, 200, 200))
+        selectorLabel:DockMargin(0, 10, 0, 5)
+
+        local selectorPanel = vgui.Create("DPanel", scroll)
+        selectorPanel:Dock(TOP)
+        selectorPanel:SetTall(70)
+        selectorPanel:DockMargin(5, 5, 5, 5)
+        selectorPanel.Paint = function(s, w, h)
+            draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50, 200))
+        end
+
+        local iconLayout = vgui.Create("DHorizontalScroller", selectorPanel)
+        iconLayout:Dock(FILL)
+        iconLayout:DockMargin(5, 5, 5, 5)
+
+        local selectedIcon = nil
+        local updateButtonFunc = nil
+
+        for _, mdlPath in ipairs(character.model) do
+            local iconButton = vgui.Create("SpawnIcon")
+            iconButton:SetSize(60, 60)
+            iconButton:SetModel(mdlPath)
+            iconButton:SetTooltip(mdlPath)
+
+            if mdlPath == currentModel then
+                selectedIcon = iconButton
+                iconButton.PaintOver = function(self, w, h)
+                    surface.SetDrawColor(Color(80, 120, 180, 255))
+                    surface.DrawOutlinedRect(0, 0, w, h, 3)
+                end
+            end
+
+            iconButton.DoClick = function()
+                modelViewer:SetModel(mdlPath)
+                local ent = modelViewer:GetEntity()
+                if IsValid(ent) then
+                    ent:SetSequence(ent:LookupSequence("idle_all_01") or 0)
+                end
+                if IsValid(selectedIcon) then
+                    selectedIcon.PaintOver = nil
+                end
+                selectedIcon = iconButton
+                iconButton.PaintOver = function(self, w, h)
+                    surface.SetDrawColor(Color(80, 120, 180, 255))
+                    surface.DrawOutlinedRect(0, 0, w, h, 3)
+                end
+                currentModel = mdlPath
+                if updateButtonFunc then
+                    updateButtonFunc(mdlPath)
+                end
+            end
+
+            iconLayout:AddPanel(iconButton)
+        end
+
+        local buttonPanel = vgui.Create("DPanel", scroll)
+        buttonPanel:Dock(TOP)
+        buttonPanel:SetTall(60)
+        buttonPanel:DockMargin(5, 15, 5, 10)
+        buttonPanel.Paint = function() end
+
+        local selectButton = vgui.Create("DButton", buttonPanel)
+        selectButton:Dock(FILL)
+        selectButton:DockMargin(50, 5, 50, 5)
+        selectButton:SetFont("DermaLarge")
+
+        local function UpdateButtonState()
+            local assignedCharacter = ply:GetNWString("AssignedCharacter", "")
+            local plyModel = ply:GetModel()
+
+            if assignedCharacter == charID then
+                if plyModel ~= currentModel then
+                    selectButton:SetEnabled(true)
+                    selectButton:SetText("Select Model")
+                    selectButton.Paint = function(s, w, h)
+                        local bgColor = Color(80, 120, 180, 255)
+                        if s:IsHovered() then bgColor = Color(100, 140, 200, 255) end
+                        draw.RoundedBox(6, 0, 0, w, h, bgColor)
+                    end
+                else
+                    selectButton:SetEnabled(false)
+                    selectButton:SetText("Current Character")
+                    selectButton.Paint = function(s, w, h)
+                        draw.RoundedBox(6, 0, 0, w, h, Color(60, 60, 60, 255))
+                    end
+                end
+            else
+                selectButton:SetEnabled(true)
+                selectButton:SetText("Select Character")
+                selectButton.Paint = function(s, w, h)
+                    local bgColor = Color(80, 180, 120, 255)
+                    if s:IsHovered() then bgColor = Color(100, 200, 140, 255) end
+                    draw.RoundedBox(6, 0, 0, w, h, bgColor)
+                end
+            end
+        end
+
+        updateButtonFunc = function()
+            UpdateButtonState()
+        end
+
+        UpdateButtonState()
+
+        selectButton.DoClick = function()
+            local assignedCharacter = ply:GetNWString("AssignedCharacter", "")
+
+            if assignedCharacter == charID then
+                net.Start("SelectCharacterModel")
+                net.WriteString(currentModel)
+                net.SendToServer()
+            else
+                net.Start("SelectCharacter")
+                net.WriteString(charID)
+                net.WriteString(currentModel)
+                net.SendToServer()
+            end
+
+            if IsValid(self) then self:Remove() end
+        end
+    end
 end
 
 function PANEL:ShowCharacterDetails(character, charID)

@@ -681,16 +681,8 @@ local function CanDropWeapon(ply, weapon)
         return false, "You cannot drop a persona skill."
     end
 
-    local charID = ply:GetNWString("AssignedCharacter", "")
-    if charID ~= "" and CHARACTERS and CHARACTERS.List and CHARACTERS.List[charID] then
-        local character = CHARACTERS.List[charID]
-        if character.weapons then
-            for _, baseWeapon in ipairs(character.weapons) do
-                if baseWeapon == weapon:GetClass() then
-                    return false, "You cannot drop your character's base weapon."
-                end
-            end
-        end
+    if TBC_IsFreeCharacterItem and TBC_IsFreeCharacterItem(ply, weapon:GetClass()) then
+        return false, "You cannot drop this item."
     end
 
     local canDrop = hook.Run("TBC_CanDropWeapon", ply, weapon)

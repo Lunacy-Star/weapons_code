@@ -12,6 +12,24 @@ if not PartyConsecutive then PartyConsecutive = 0 end
 -- Party Id is a unique, ever-increasing number (stored as a string table key) that should not
 -- be reset until server restart. PartyConsecutive is the next number that will be handed out.
 
+-- PlayerParties[PartyId][TotalKilodevil] is the summed kilodevil cost of all current members'
+-- assigned characters. New members may not push this above the smt_party_kilodevil_limit ConVar.
+-- Replicated so the client can display "current / limit" in the Party tab. Changing it requires
+-- server console/RCON access or an admin using /partylimit - a plain client console command
+-- cannot alter a server ConVar remotely.
+local PartyKilodevilLimitConVar = CreateConVar(
+    "smt_party_kilodevil_limit",
+    "500",
+    bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED),
+    "Maximum total kilodevil a party's members may have combined.",
+    1,
+    100000
+)
+
+function GetPartyKilodevilLimit()
+    return PartyKilodevilLimitConVar:GetInt()
+end
+
 if SERVER then
     util.AddNetworkString("PlayerPartyUpdate")
     util.AddNetworkString("PlayerPartyRemove")
@@ -34,7 +52,10 @@ if SERVER then
         net.Send(targetPlayer)
     end
 
-    local function BroadcastPlayerParty(player, partyId)
+    -- Global (not local) so other files - e.g. character_selection_sv.lua,
+    -- which needs to re-broadcast a party after a member's kilodevil changes -
+    -- can push an updated snapshot without duplicating this logic.
+    function BroadcastPlayerParty(player, partyId)
         if not IsValid(player) then return end
 
         net.Start("PlayerPartyUpdate")
@@ -43,6 +64,37 @@ if SERVER then
         net.WriteInt(PartyConsecutive, 32)
         net.WriteTable(PlayerParties[partyId])
         net.Broadcast()
+    end
+
+    -- A player's kilodevil cost is their assigned character's `kilodevil` field,
+    -- defaulting to 100 (the standard human cost) if unset or unassigned.
+    function GetPlayerKilodevil(ply)
+        if not IsValid(ply) then return 100 end
+
+        local charID = ply:GetNWString("AssignedCharacter", "")
+        if charID ~= "" and CHARACTERS and CHARACTERS.List and CHARACTERS.List[charID] then
+            return CHARACTERS.List[charID].kilodevil or 100
+        end
+
+        return 100
+    end
+
+    -- Recomputes and stores a party's total kilodevil from its current members'
+    -- assigned characters (never trusted as an incrementally-maintained value,
+    -- since a member's cost can change any time they switch characters).
+    function RecalculatePartyKilodevil(partyId)
+        local party = PlayerParties[partyId]
+        if not party then return 0 end
+
+        local total = 0
+        for _, memberData in pairs(party["Members"]) do
+            if IsValid(memberData) then
+                total = total + GetPlayerKilodevil(memberData)
+            end
+        end
+
+        party["TotalKilodevil"] = total
+        return total
     end
 
     local function RemovePartyOrderEntry(partyId, steamID)
@@ -66,29 +118,52 @@ if SERVER then
             PartyName = player:Nick() .. "'s Party",
             PartyLead = player:SteamID(),
             Members = {},
-            Order = {}
+            Order = {},
+            TotalKilodevil = 0
         }
 
         PlayerParties[partyId]["Members"][player:SteamID()] = player
         table.insert(PlayerParties[partyId]["Order"], player:SteamID())
+        PlayerParties[partyId]["TotalKilodevil"] = GetPlayerKilodevil(player)
 
         BroadcastPlayerParty(player, partyId)
         return partyId
     end
 
+    -- Adding a member is not allowed to push the party's total kilodevil
+    -- above smt_party_kilodevil_limit. The capacity check runs before the
+    -- player is pulled out of any existing party, so a rejected join never
+    -- leaves them stranded without a party.
     function AssignParty(player, partyId)
-        if not IsValid(player) then return end
-        if IsPlayerInAnyParty(player) then
-            local pastPartyId = IsPlayerInAnyParty(player)
-            RemoveFromParty(player, pastPartyId)
-        end
+        if not IsValid(player) then return false end
 
         local party = PlayerParties[partyId]
-        if not party then return end
+        if not party then return false end
+
+        local pastPartyId = IsPlayerInAnyParty(player)
+        if pastPartyId == partyId then return true end
+
+        local memberKD = GetPlayerKilodevil(player)
+        local currentTotal = RecalculatePartyKilodevil(partyId)
+        local limit = GetPartyKilodevilLimit()
+
+        if currentTotal + memberKD > limit then
+            player:ChatPrint(
+                "You couldn't join " .. (party["PartyName"] or "the party") ..
+                " - not enough kilodevil capacity (" .. currentTotal .. "/" .. limit ..
+                ", this would need " .. memberKD .. " more)."
+            )
+            return false
+        end
+
+        if pastPartyId then
+            RemoveFromParty(player, pastPartyId)
+        end
 
         party["Members"][player:SteamID()] = player
         party["Order"] = party["Order"] or {}
         table.insert(party["Order"], player:SteamID())
+        party["TotalKilodevil"] = currentTotal + memberKD
 
         player:ChatPrint("You joined " .. (party["PartyName"] or "the party") .. "!")
         for _, memberData in pairs(party["Members"]) do
@@ -98,6 +173,7 @@ if SERVER then
         end
 
         BroadcastPlayerParty(player, partyId)
+        return true
     end
 
     function RemoveFromParty(player, partyId)
@@ -133,6 +209,8 @@ if SERVER then
             end
         end
 
+        RecalculatePartyKilodevil(partyId)
+
         for _, memberData in pairs(party["Members"]) do
             if IsValid(memberData) then
                 memberData:ChatPrint(player:Nick() .. " has left the party!")
@@ -161,6 +239,8 @@ if SERVER then
         if IsValid(targetPlayer) then
             targetPlayer:ChatPrint("You have been kicked from the party by " .. player:Nick() .. ".")
         end
+
+        RecalculatePartyKilodevil(partyId)
 
         for _, memberData in pairs(party["Members"]) do
             if IsValid(memberData) then
@@ -286,6 +366,8 @@ if SERVER then
             end
         end
 
+        RecalculatePartyKilodevil(partyId)
+
         for _, memberData in pairs(party["Members"]) do
             if IsValid(memberData) then
                 memberData:ChatPrint(target:Nick() .. " was removed from the party by " .. adminName .. ".")
@@ -352,6 +434,16 @@ if SERVER then
         end
 
         local party = PlayerParties[partyId]
+
+        -- Advisory only - AssignParty re-checks this authoritatively at accept
+        -- time, since capacity can change while the invite is pending.
+        local memberKD = GetPlayerKilodevil(target)
+        local currentTotal = RecalculatePartyKilodevil(partyId)
+        local limit = GetPartyKilodevilLimit()
+        if currentTotal + memberKD > limit then
+            return false, "Inviting " .. target:Nick() .. " would exceed the party's kilodevil limit (" ..
+                currentTotal .. "/" .. limit .. ", needs " .. memberKD .. " more)."
+        end
 
         PartyPendingInvites[target:SteamID()] = {
             partyId = partyId,
@@ -445,6 +537,32 @@ if SERVER then
     hook.Add("PlayerDisconnected", "RemoveFromPartyOnPlayerDisconnect", function(player)
         local partyId = IsPlayerInAnyParty(player)
         if partyId then
+            RemoveFromParty(player, partyId)
+        end
+    end)
+
+    -- A death that actually came from TBC combat (TBCHP already at 0, e.g. a
+    -- team wipe via CheckForTeamDefeat) permanently costs a partied player
+    -- their spot: respawning after this is what pays that cost. They keep
+    -- whatever chance of being revived exists before they respawn - once
+    -- they choose to respawn, that chance and their party membership are
+    -- both gone for good.
+    hook.Add("PlayerDeath", "TBC_FlagPartyRemovalOnRespawn", function(victim)
+        if not IsValid(victim) then return end
+        if victim:GetNWInt("TBCHP", 0) > 0 then return end
+        if not IsPlayerInAnyParty(victim) then return end
+
+        victim.TBC_PartyRemovalPendingOnRespawn = true
+        victim:ChatPrint("You have fallen in battle. Respawning will permanently remove you from your party.")
+    end)
+
+    hook.Add("PlayerSpawn", "TBC_ApplyPendingPartyRemoval", function(player)
+        if not player.TBC_PartyRemovalPendingOnRespawn then return end
+        player.TBC_PartyRemovalPendingOnRespawn = nil
+
+        local partyId = IsPlayerInAnyParty(player)
+        if partyId then
+            player:ChatPrint("You have respawned and been permanently removed from your party.")
             RemoveFromParty(player, partyId)
         end
     end)

@@ -106,7 +106,7 @@ CHARACTERS.List = {
     },
     -- STUDENTS
     ["student_a"] = {
-        name = "Gekkoukan High School Student A",
+        name = "Gekkoukan High School Student",
         color = Color(20, 150, 20, 255),
         model = {
             "models/blacksurvival_nk/jenny/jenny_bs.mdl",
@@ -114,6 +114,9 @@ CHARACTERS.List = {
             "models/blacksurvival_nk/cathy/cathy_bs.mdl"
         },
         description = [[A student who attends Gekkoukan High School. They innately share the potential to awakening Personas. These students have more affinity with magic.]],
+        variantGroup = "student",
+        variantGroupName = "Gekkoukan High School Student",
+        variantLabel = "Variant A",
         weapons = {"smti_engageswep", "smti_unarmedfists"},
         loadoutItems = {"persona_jackfrost", "persona_pixie"},
         essence = 1,
@@ -140,7 +143,7 @@ CHARACTERS.List = {
         repel = {}
     },
     ["student_b"] = {
-        name = "Gekkoukan High School Student B",
+        name = "Gekkoukan High School Student",
         color = Color(20, 150, 20, 255),
         model = {
             "models/blacksurvival_nk/jenny/jenny_bs.mdl",
@@ -148,6 +151,9 @@ CHARACTERS.List = {
             "models/blacksurvival_nk/cathy/cathy_bs.mdl"
         },
         description = [[A student who attends Gekkoukan High School. They innately share the potential to awakening Personas. These students have more affinity with physicality.]],
+        variantGroup = "student",
+        variantGroupName = "Gekkoukan High School Student",
+        variantLabel = "Variant B",
         weapons = {"smti_engageswep", "smti_unarmedfists"},
         loadoutItems = {"persona_jackfrost", "persona_pixie"},
         essence = 1,
@@ -183,6 +189,9 @@ CHARACTERS.List = {
             "models/blacksurvival_nk/cathy/cathy_bs.mdl"
         },
         description = [[An adult who lives in or is visiting Tatsumi Port Island. They innately share the potential to awakening Personas.]],
+        variantGroup = "citizen",
+        variantGroupName = "Citizen",
+        variantLabel = "Variant A",
         weapons = {"smti_engageswep", "smti_unarmedfists"},
         loadoutItems = {"persona_jackfrost", "persona_pixie"},
         essence = 1,
@@ -209,7 +218,7 @@ CHARACTERS.List = {
         repel = {}
     },
     ["citizen_b"] = {
-        name = "Citizen B",
+        name = "Citizen",
         color = Color(20, 150, 20, 255),
         model = {
             "models/blacksurvival_nk/jenny/jenny_bs.mdl",
@@ -217,6 +226,9 @@ CHARACTERS.List = {
             "models/blacksurvival_nk/cathy/cathy_bs.mdl"
         },
         description = [[A student who attends Gekkoukan High School. They innately share the potential to awakening Personas. These students have more affinity with physicality.]],
+        variantGroup = "citizen",
+        variantGroupName = "Citizen",
+        variantLabel = "Variant B",
         weapons = {"smti_engageswep", "smti_unarmedfists"},
         loadoutItems = {"persona_jackfrost", "persona_pixie"},
         essence = 1,
@@ -2463,6 +2475,9 @@ CHARACTERS.List = {
 
 An elf-like creature who is the embodiment of all that is cold. It is said that he is the one who leaves those beautiful icy patterns on windows in the morning.
 ]],
+        variantGroup = "jack_frost",
+        variantGroupName = "Jack Frost",
+        variantLabel = "Variant A",
         weapons = {
             "smti_engageswep",
             "smti_unarmedfists",
@@ -2529,6 +2544,9 @@ An elf-like creature who is the embodiment of all that is cold. It is said that 
 
 An elf-like creature who is the embodiment of all that is cold. It is said that he is the one who leaves those beautiful icy patterns on windows in the morning.
 ]],
+        variantGroup = "jack_frost",
+        variantGroupName = "Jack Frost",
+        variantLabel = "Variant B",
         weapons = {
             "smti_engageswep",
             "smti_unarmedfists",
@@ -2595,6 +2613,9 @@ An elf-like creature who is the embodiment of all that is cold. It is said that 
 
 A small fairy found in southwestern Britain known for their cheerful nature and love of pranks. Their physical appearance changes from region to region, but their personality is always playful and mischievous. A common prank they like to pull is causing humans to wander in circles. However, they are also known to help farmers from time to time and are generally considered good fairies.
 ]],
+        variantGroup = "pixie",
+        variantGroupName = "Pixie",
+        variantLabel = "Variant A",
         weapons = {
             "smti_engageswep",
             "smti_unarmedfists",
@@ -2665,6 +2686,9 @@ A small fairy found in southwestern Britain known for their cheerful nature and 
 
 A small fairy found in southwestern Britain known for their cheerful nature and love of pranks. Their physical appearance changes from region to region, but their personality is always playful and mischievous. A common prank they like to pull is causing humans to wander in circles. However, they are also known to help farmers from time to time and are generally considered good fairies.
 ]],
+        variantGroup = "pixie",
+        variantGroupName = "Pixie",
+        variantLabel = "Variant B",
         weapons = {
             "smti_engageswep",
             "smti_unarmedfists",
@@ -2735,6 +2759,9 @@ A small fairy found in southwestern Britain known for their cheerful nature and 
 
 A dog spirit said to possess people in Japanese lore. Those possessed are in a state of "inu-tsuki" and lose consciousness. Onmyoji use Inugami as familiars.
 ]],
+        variantGroup = "inugami",
+        variantGroupName = "Inugami",
+        variantLabel = "Variant A",
         weapons = {
             "smti_engageswep",
             "smti_unarmedfists",

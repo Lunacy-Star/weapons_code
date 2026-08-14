@@ -287,15 +287,7 @@ end
 local function CanStoreWeapon(ply, weapon)
     if not IsValid(weapon) then return false end
     if weapon.PersonaSkill then return false end
-    local charID = ply:GetNWString("AssignedCharacter", "")
-    if charID ~= "" and CHARACTERS and CHARACTERS.List and CHARACTERS.List[charID] then
-        local charData = CHARACTERS.List[charID]
-        if charData.weapons then
-            for _, bw in ipairs(charData.weapons) do
-                if bw == weapon:GetClass() then return false end
-            end
-        end
-    end
+    if TBC_IsFreeCharacterItem and TBC_IsFreeCharacterItem(ply, weapon:GetClass()) then return false end
     local canDrop = hook.Run("TBC_CanDropWeapon", ply, weapon)
     if canDrop == false then return false end
     return true

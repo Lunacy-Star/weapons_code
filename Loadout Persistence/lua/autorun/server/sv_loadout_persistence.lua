@@ -61,16 +61,13 @@ end
 -- ============================================================
 -- Collecting "extras" -- everything owned beyond the character's freebies
 -- ============================================================
-local function IsBaseWeapon(character, classname)
-    if not character or not character.weapons then
-        return false
-    end
-    for _, base in ipairs(character.weapons) do
-        if base == classname then
-            return true
-        end
-    end
-    return false
+-- Base loadout weapons AND essence-purchased loadoutItems (weapons or
+-- personas) are both free, re-picked every time the player becomes this
+-- character -- see TBC_IsFreeCharacterItem in character_selection_sv.lua.
+-- Neither may ever be treated as "extra": that would let a player bank an
+-- essence item once and re-purchase it again next time, duplicating it.
+local function IsFreeCharacterItem(ply, key)
+    return TBC_IsFreeCharacterItem and TBC_IsFreeCharacterItem(ply, key)
 end
 
 local function GetItemImage(classname)
@@ -88,7 +85,7 @@ local function CollectExtras(ply, charID)
     local entries = {}
 
     for _, weapon in pairs(ply:GetWeapons()) do
-        if IsValid(weapon) and not weapon.PersonaSkill and not IsBaseWeapon(character, weapon:GetClass()) then
+        if IsValid(weapon) and not weapon.PersonaSkill and not IsFreeCharacterItem(ply, weapon:GetClass()) then
             local wdata = weapons.Get(weapon:GetClass())
             table.insert(
                 entries,
@@ -130,7 +127,7 @@ local function CollectExtras(ply, charID)
 
     local permaPersonas = GetAllStats(ply, "permapersonas")
     for name, data in pairs(GetAllStats(ply, "personas")) do
-        if permaPersonas[name] == nil then
+        if permaPersonas[name] == nil and not IsFreeCharacterItem(ply, name) then
             local pdata = Personas and Personas[name]
             table.insert(
                 entries,

@@ -33,6 +33,11 @@ function ApplyCharacterToPlayer(ply, charID, modelPath)
         LOADOUTPERSIST.StashExtras(ply)
     end
 
+    -- Essence-picked weapons only belong to the character they were picked
+    -- for -- clear the tracked set now that the switch is committed, so the
+    -- new character starts with nothing marked free until it grants its own.
+    ply.TBC_EssenceWeapons = {}
+
     local character = CHARACTERS.List[charID]
 
     -- Resolve model
@@ -118,6 +123,16 @@ function ApplyCharacterToPlayer(ply, charID, modelPath)
         ply:StripWeapons()
         for _, weapon in ipairs(character.weapons) do
             ply:Give(weapon)
+        end
+    end
+
+    -- This character's kilodevil cost may differ from the last one, so keep
+    -- the party's stored total (and everyone's synced copy of it) accurate.
+    if IsPlayerInAnyParty and RecalculatePartyKilodevil and BroadcastPlayerParty then
+        local partyId = IsPlayerInAnyParty(ply)
+        if partyId then
+            RecalculatePartyKilodevil(partyId)
+            BroadcastPlayerParty(ply, partyId)
         end
     end
 
@@ -369,4 +384,55 @@ function GetPlayerCharacter(ply)
     end
 
     return nil
+end
+
+-- ============================================================
+-- Utility: is `key` something ply's current character hands out for free?
+-- Covers three cases, none of which may ever be treated as player-owned --
+-- not droppable, not storable, not bankable by Loadout Persistence -- since
+-- they're re-granted fresh (at an essence cost, for the latter two) every
+-- time the player becomes this character, not earned once and kept forever:
+--   1. A base loadout weapon (charData.weapons).
+--   2. An essence-picked Persona (charData.loadoutItems keys match Personas
+--      table keys directly -- no indirection layer -- so pool-membership
+--      alone correctly identifies these).
+--   3. An essence-picked weapon. These CANNOT be recognized via
+--      charData.loadoutItems pool-membership: loadout_menu.lua's
+--      OpenLoadoutMenu picks by LoadoutItems[key] and gives
+--      LoadoutItems[key].class, so the classname the player actually holds
+--      is never equal to the loadoutItems pool key. Instead, loadout_menu.lua
+--      tracks exactly which classnames essence granted this character-life in
+--      ply.TBC_EssenceWeapons (reset below on every switch).
+-- ============================================================
+function TBC_IsFreeCharacterItem(ply, key)
+    if not IsValid(ply) then
+        return false
+    end
+
+    local charID = ply:GetNWString("AssignedCharacter", "")
+    if CHARACTERS and CHARACTERS.List and CHARACTERS.List[charID] then
+        local character = CHARACTERS.List[charID]
+
+        if character.weapons then
+            for _, base in ipairs(character.weapons) do
+                if base == key then
+                    return true
+                end
+            end
+        end
+
+        if character.loadoutItems then
+            for _, item in pairs(character.loadoutItems) do
+                if item == key then
+                    return true
+                end
+            end
+        end
+    end
+
+    if ply.TBC_EssenceWeapons and ply.TBC_EssenceWeapons[key] then
+        return true
+    end
+
+    return false
 end

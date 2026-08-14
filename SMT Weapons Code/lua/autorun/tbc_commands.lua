@@ -143,6 +143,31 @@ if SERVER then
         return ""
     end)
 
+    -- Admin-only: sets the server-wide party kilodevil capacity.
+    hook.Add("PlayerSay", "PartyLimitChatCommand", function(ply, text)
+        local cmd = string.lower(text)
+        if string.sub(cmd, 1, 12) ~= "/partylimit " then
+            return
+        end
+
+        if not ply:IsAdmin() then
+            ply:ChatPrint("You do not have permission to use this command.")
+            return ""
+        end
+
+        local value = tonumber(string.Trim(string.sub(text, 13)))
+        if not value or value <= 0 then
+            ply:ChatPrint("Usage: /partylimit <number>")
+            return ""
+        end
+
+        value = math.floor(value)
+        RunConsoleCommand("smt_party_kilodevil_limit", tostring(value))
+        ply:ChatPrint("Party kilodevil limit set to " .. value .. ".")
+
+        return ""
+    end)
+
     concommand.Add("useturn", function(ply, cmd, args)
         -- Validate if the player is in a fight
         local engageWeapon = ply:GetWeapon("smti_engageswep")

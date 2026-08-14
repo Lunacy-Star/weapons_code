@@ -187,7 +187,12 @@ if CLIENT then
         end
     end
 
-    function OpenPersonaDetailWindow(frame, itemClass)
+    -- Namespaced (not just "OpenPersonaDetailWindow") because custom_tab_menu.lua
+    -- declares a same-named global for its own, differently-shaped Inventory-tab
+    -- persona preview; whichever file loaded last was silently winning and being
+    -- called from here with the wrong arguments, crashing on a NULL TabMenu
+    -- whenever the F4 inventory menu wasn't already open.
+    function OpenLoadoutPersonaDetailWindow(frame, itemClass)
         if IsValid(detailFrame) then
             detailFrame:Close()
         end
@@ -345,7 +350,7 @@ if CLIENT then
                 local line = availableListView:AddLine(persona.name or itemClass)
                 line.itemClass = itemClass
                 line.OnCursorEntered = function()
-                    OpenPersonaDetailWindow(frame, itemClass)
+                    OpenLoadoutPersonaDetailWindow(frame, itemClass)
                 end
                 line.OnCursorExited = function()
                     if IsValid(detailFrame) then
@@ -361,7 +366,7 @@ if CLIENT then
                 local selectedLine = selectedListView:AddLine(row:GetValue(1))
                 selectedLine.itemClass = itemClass
                 selectedLine.OnCursorEntered = function()
-                    OpenPersonaDetailWindow(frame, itemClass)
+                    OpenLoadoutPersonaDetailWindow(frame, itemClass)
                 end
                 selectedLine.OnCursorExited = function()
                     if IsValid(detailFrame) then
@@ -380,7 +385,7 @@ if CLIENT then
             local availableLine = availableListView:AddLine(row:GetValue(1))
             availableLine.itemClass = itemClass
             availableLine.OnCursorEntered = function()
-                OpenPersonaDetailWindow(frame, itemClass)
+                OpenLoadoutPersonaDetailWindow(frame, itemClass)
             end
             availableLine.OnCursorExited = function()
                 if IsValid(detailFrame) then
@@ -453,6 +458,23 @@ if SERVER then
     util.AddNetworkString("ConfirmPersona")
     util.AddNetworkString("SaveLoadout")
 
+    -- Weapon classnames essence actually granted this character-life. Essence
+    -- items go through LoadoutItems[key].class indirection, so their final
+    -- classname can't be recognized just by checking charData.loadoutItems
+    -- pool-membership the way base weapons and personas can (personas have no
+    -- such indirection). Tracked here so TBC_IsFreeCharacterItem
+    -- (character_selection_sv.lua) can tell CanDropWeapon/CanStoreWeapon/
+    -- Loadout Persistence "this is free, not player-owned" -- otherwise a
+    -- player could drop/bank an essence item once and re-pick a duplicate of
+    -- it next time. Reset on every character switch inside ApplyCharacterToPlayer.
+    local function MarkEssenceWeapon(ply, itemClass)
+        if not IsValid(ply) then
+            return
+        end
+        ply.TBC_EssenceWeapons = ply.TBC_EssenceWeapons or {}
+        ply.TBC_EssenceWeapons[itemClass] = true
+    end
+
     hook.Add(
         "PlayerDisconnected",
         "ClearSavedLoadoutOnDisconnect",
@@ -489,6 +511,7 @@ if SERVER then
                     local items = util.JSONToTable(savedLoadout)
                     for _, itemClass in pairs(items) do
                         ply:Give(itemClass)
+                        MarkEssenceWeapon(ply, itemClass)
                     end
                 elseif savedPersona then
                     local items = util.JSONToTable(savedPersona)
@@ -530,6 +553,7 @@ if SERVER then
             end
             for _, itemClass in pairs(selectedItems) do
                 ply:Give(itemClass)
+                MarkEssenceWeapon(ply, itemClass)
             end
         end
     )
