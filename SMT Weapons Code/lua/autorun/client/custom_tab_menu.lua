@@ -2509,11 +2509,31 @@ function PANEL:LoadSettingsContent()
     label:SetTextColor(Color(255, 255, 255))
     label:DockMargin(10, 10, 10, 10)
 
-    local info = vgui.Create("DLabel", self.Content)
-    info:Dock(TOP)
-    info:SetText("Settings options will go here...")
-    info:SetTextColor(Color(200, 200, 200))
-    info:DockMargin(10, 0, 10, 10)
+    local function SectionHeader(text)
+        local lbl = vgui.Create("DLabel", self.Content)
+        lbl:Dock(TOP)
+        lbl:SetText(text)
+        lbl:SetFont("DermaDefaultBold")
+        lbl:SetTextColor(Color(180, 180, 180))
+        lbl:DockMargin(10, 4, 10, 4)
+        lbl:SetAutoStretchVertical(true)
+    end
+
+    local function SettingCheckbox(text, convar)
+        local checkbox = vgui.Create("DCheckBoxLabel", self.Content)
+        checkbox:Dock(TOP)
+        checkbox:SetText(text)
+        checkbox:SetTextColor(Color(220, 220, 220))
+        checkbox:DockMargin(10, 2, 10, 2)
+        checkbox:SetConVar(convar)
+        checkbox:SetValue(GetConVar(convar):GetBool())
+        return checkbox
+    end
+
+    SectionHeader("Battle Announcements")
+    SettingCheckbox("Show battle announcements in chat", "smt_chatprint_showchat")
+    SettingCheckbox("Show battle announcement blocks on screen", "smt_chatprint_showblocks")
+    SettingCheckbox("Show other party notifications", "smt_chatprint_shownearby")
 end
 
 vgui.Register("CustomTabMenu", PANEL, "DFrame")

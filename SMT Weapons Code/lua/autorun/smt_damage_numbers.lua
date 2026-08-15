@@ -53,7 +53,7 @@ if CLIENT then
 
     surface.CreateFont("SMTDamageNumberFont", {
         font = "Arial Black",
-        size = 22,
+        size = 28,
         weight = 800,
         antialias = true
     })

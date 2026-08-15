@@ -4,6 +4,7 @@ include("autorun/affinitiesailments.lua")
 include("autorun/effects_manager.lua")
 include("autorun/buffs_manager.lua")
 include("autorun/skill_functions.lua")
+include("autorun/smt_chatprint.lua")
 include("autorun/client/cl_cza.lua")
 
 TBCWeaponMetatable = TBCWeaponMetatable or {}
@@ -11,69 +12,37 @@ TBCWeaponMetatable.OngoingFights = TBCWeaponMetatable.OngoingFights or {}
 
 local victoryMessageSent = {}
 
+-- Demons don't get their own chat line; their master already receives this
+-- message directly as a fight member in their own right.
+local function TBC_GetFightPlayers(fight)
+    local playersInFight = {}
+    for _, side in ipairs({"Side1", "Side2"}) do
+        for _, member in ipairs(fight[side]) do
+            if IsValid(member) and member:IsPlayer() then
+                table.insert(playersInFight, member)
+            end
+        end
+    end
+    return playersInFight
+end
+
 function TBCWeaponMetatable:AnnounceAbility()
     local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
-    if fight then
-        local playerSide =
-            (table.HasValue(fight.Side1, self.Owner) and "Side1") or
-            (table.HasValue(fight.Side2, self.Owner) and "Side2")
-    else
+    if not fight then
         return
     end
 
-    local playersInFight = {}
-    for _, player in ipairs(fight.Side1) do
-        -- Demons don't get their own chat line; their master already
-        -- receives this message directly as a fight member in their own right.
-        if IsValid(player) and player:IsPlayer() then
-            table.insert(playersInFight, player)
-        end
-    end
-    for _, player in ipairs(fight.Side2) do
-        if IsValid(player) and player:IsPlayer() then
-            table.insert(playersInFight, player)
-        end
-    end
-
-    -- Send chat message only to players involved in the fight
-    for _, player in ipairs(playersInFight) do
-        if IsValid(player) then -- Check if the player is valid
-            player:ChatPrint(self.Owner:Nick() .. " used " .. self.PrintName .. "!")
-        end
-    end
+    SMT_ChatPrint(TBC_GetFightPlayers(fight), self.Owner:GetPos(), self.Owner:Nick() .. " used " .. self.PrintName .. "!")
 end
 
 function TBCWeaponMetatable:AnnounceMessage(message)
     local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
-    if fight then
-        local playerSide =
-            (table.HasValue(fight.Side1, self.Owner) and "Side1") or
-            (table.HasValue(fight.Side2, self.Owner) and "Side2")
-    else
+    if not fight then
         print("Fight not found") -- Debug line
         return
     end
 
-    local playersInFight = {}
-    for _, player in ipairs(fight.Side1) do
-        -- Demons don't get their own chat line; their master already
-        -- receives this message directly as a fight member in their own right.
-        if IsValid(player) and player:IsPlayer() then
-            table.insert(playersInFight, player)
-        end
-    end
-    for _, player in ipairs(fight.Side2) do
-        if IsValid(player) and player:IsPlayer() then
-            table.insert(playersInFight, player)
-        end
-    end
-
-    -- Send chat message only to players involved in the fight
-    for _, player in ipairs(playersInFight) do
-        if IsValid(player) then -- Check if the player is valid
-            player:ChatPrint(message)
-        end
-    end
+    SMT_ChatPrint(TBC_GetFightPlayers(fight), self.Owner:GetPos(), message)
 end
 
 function TBCWeaponMetatable:AbilityRollNumber(weaponTechnique, target)
