@@ -36,6 +36,10 @@ if SERVER then
 
         BroadcastPlayerStat(player, statType)
 
+        if SMTDamageNumbers and (statType == "buffs" or statType == "debuffs") then
+            local stacks = (istable(buffData) and buffData.stacks) or 1
+            SMTDamageNumbers.Show(player, stacks, statType == "buffs" and "buff" or "debuff", buffName)
+        end
     end
 
     function RemoveStat(player, buffName, statType)

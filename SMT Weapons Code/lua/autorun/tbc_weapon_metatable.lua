@@ -110,6 +110,10 @@ function TBCWeaponMetatable:AbilityRollNumber(weaponTechnique, target)
                 local roll = math.random(100)
                 local result = roll <= hitChance and true or false
 
+                if not result and SMTDamageNumbers then
+                    SMTDamageNumbers.Show(target, nil, "miss")
+                end
+
                 if fight then
                     local playersInFight = {}
                     for _, player in ipairs(fight.Side1) do

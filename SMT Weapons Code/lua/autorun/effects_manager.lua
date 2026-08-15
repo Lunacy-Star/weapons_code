@@ -341,6 +341,10 @@ function HandleRepel(ply, target, effectsTable)
     end
 
     if isRepelled then
+        if SMTDamageNumbers then
+            SMTDamageNumbers.Show(target, nil, "repel")
+        end
+
         effectsTable["state"] = "repel"
         effectsTable["target"] = ply
         effectsTable["targetBuffsTable"] = effectsTable["userBuffsTable"]
@@ -572,6 +576,14 @@ function HandleDamageMessage(ply, target, effectsTable)
         effectsTable["message"] = target:Name() .. " received " .. effectsTable["baseDamage"] .. " damage!"
     end
 
+    if SMTDamageNumbers then
+        if effectsTable["state"] == "block" then
+            SMTDamageNumbers.Show(target, nil, "block")
+        else
+            SMTDamageNumbers.Show(target, effectsTable["baseDamage"], effectsTable["state"])
+        end
+    end
+
     HandleStateEffects(ply, target, effectsTable)
 
     return effectsTable
@@ -593,6 +605,10 @@ function HandleDeath(ply, target, effectsTable)
 
         local message = target:Name() .. " is dead!"
         weapon:AnnounceMessage(message)
+
+        if SMTDamageNumbers then
+            SMTDamageNumbers.Show(target, nil, "dead")
+        end
 
         RemoveAllStats(target, "buffs")
         RemoveAllStats(target, "debuffs")
@@ -618,6 +634,10 @@ end
 function HandleHealingEffects(ply, target, effectsTable)
     HandleStatus(ply, effectsTable["userBuffsTable"], "reactionHeal", "heal", effectsTable)
     HandleStatus(target, effectsTable["targetBuffsTable"], "reactionHeal", "heal", effectsTable)
+
+    if SMTDamageNumbers then
+        SMTDamageNumbers.Show(target, effectsTable["baseDamage"], "heal")
+    end
 
     return effectsTable
 end
@@ -824,6 +844,10 @@ function HandleInstakill(ply, target, effectsTable)
     end
 
     effectsTable["target"]:SetNWInt("TBCHP", 0)
+
+    if SMTDamageNumbers then
+        SMTDamageNumbers.Show(effectsTable["target"], nil, "dead")
+    end
 
     self:AnnounceMessage(effectsTable["target"]:Name() .. " is killed instantly!")
 
