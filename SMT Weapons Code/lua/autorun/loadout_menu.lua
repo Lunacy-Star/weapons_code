@@ -192,6 +192,11 @@ if CLIENT then
     -- persona preview; whichever file loaded last was silently winning and being
     -- called from here with the wrong arguments, crashing on a NULL TabMenu
     -- whenever the F4 inventory menu wasn't already open.
+    -- Rows are Dock(TOP) + SetAutoStretchVertical inside a scroll panel (same
+    -- approach as custom_tab_menu.lua's OpenPersonaDetailWindow) rather than
+    -- manually computing pixel heights via surface.GetTextSize: that estimate
+    -- doesn't account for wrapping or embedded "\n"s in weapon Purpose text,
+    -- so rows undersized their box and the next row overlapped/clipped it.
     function OpenLoadoutPersonaDetailWindow(frame, itemClass)
         if IsValid(detailFrame) then
             detailFrame:Close()
@@ -204,10 +209,10 @@ if CLIENT then
 
         detailFrame = vgui.Create("DFrame")
         local x, y = frame:GetPos()
-        local width, _ = frame:GetSize()
+        local width, height = frame:GetSize()
         local bgColor = Color(44, 47, 51, 255)
 
-        detailFrame:SetSize(400, _)
+        detailFrame:SetSize(400, height)
         detailFrame:SetPos(x + width + 5, y)
         detailFrame:SetTitle("Item Details")
         detailFrame:MakePopup()
@@ -215,68 +220,41 @@ if CLIENT then
             draw.RoundedBox(10, 0, 0, w, h, bgColor)
         end
 
-        local startY = 20
-        local gap = 5
-        local labelFont = "Default"
+        local scroll = vgui.Create("DScrollPanel", detailFrame)
+        scroll:Dock(FILL)
+        scroll:DockMargin(10, 30, 10, 10)
 
-        local function CalcWrappedTextHeight(text, width, font)
-            surface.SetFont(font)
-            local _, h = surface.GetTextSize("W")
-            local lines = math.ceil(surface.GetTextSize(text) / width)
-            return h * lines
+        local function AddRow(text, font, color)
+            local lbl = vgui.Create("DLabel", scroll)
+            lbl:Dock(TOP)
+            lbl:SetText(text)
+            lbl:SetFont(font or "Default")
+            lbl:SetTextColor(color or Color(220, 220, 220))
+            lbl:SetWrap(true)
+            lbl:SetAutoStretchVertical(true)
+            lbl:DockMargin(0, 0, 0, 5)
+            return lbl
         end
 
-        local nameLabel = vgui.Create("DLabel", detailFrame)
-        nameLabel:SetFont(labelFont)
-        nameLabel:SetPos(10, startY)
-        nameLabel:SetSize(280, 20)
-        nameLabel:SetText(persona.name or itemClass)
+        AddRow(persona.name or itemClass, "DermaLarge", Color(255, 255, 255))
 
-        local nextY = startY + nameLabel:GetTall() + gap
-
-        local descLabel = vgui.Create("DLabel", detailFrame)
-        descLabel:SetFont(labelFont)
-        descLabel:SetPos(10, nextY)
-        local descHeight = CalcWrappedTextHeight(persona.description or "", 280, labelFont)
-        descLabel:SetSize(350, descHeight)
-        descLabel:SetWrap(true)
-        descLabel:SetText(persona.description or "")
-        nextY = nextY + descHeight + gap + 10
+        if persona.description and persona.description ~= "" then
+            AddRow(persona.description)
+        end
 
         if persona.race then
-            local lbl = vgui.Create("DLabel", detailFrame)
-            lbl:SetFont(labelFont)
-            lbl:SetPos(10, nextY)
-            local h = CalcWrappedTextHeight(persona.race, 280, labelFont)
-            lbl:SetSize(280, h)
-            lbl:SetWrap(true)
-            lbl:SetText("Race: " .. persona.race)
-            nextY = nextY + h + gap
+            AddRow("Race: " .. persona.race)
         end
 
         if persona.arcana then
-            local lbl = vgui.Create("DLabel", detailFrame)
-            lbl:SetFont(labelFont)
-            lbl:SetPos(10, nextY)
-            local h = CalcWrappedTextHeight(persona.arcana, 280, labelFont)
-            lbl:SetSize(280, h)
-            lbl:SetWrap(true)
-            lbl:SetText("Arcana: " .. persona.arcana)
-            nextY = nextY + h + gap + 10
+            AddRow("Arcana: " .. persona.arcana)
         end
 
         local function ResistRow(label, tbl)
             if not tbl or #tbl == 0 then
                 return
             end
-            local lbl = vgui.Create("DLabel", detailFrame)
-            lbl:SetFont(labelFont)
-            lbl:SetPos(10, nextY)
-            local txt = label .. ": " .. table.concat(tbl, ", ")
-            local h = CalcWrappedTextHeight(txt, 280, labelFont)
-            lbl:SetSize(280, h)
-            lbl:SetText(txt)
-            nextY = nextY + h + gap
+            AddRow(label .. ": " .. table.concat(tbl, ", "))
         end
 
         ResistRow("Resist", persona.resist)
@@ -285,15 +263,12 @@ if CLIENT then
         ResistRow("Drain", persona.drain)
         ResistRow("Repel", persona.repel)
 
-        nextY = nextY + gap + 10
-
         if persona.skills and #persona.skills > 0 then
+            AddRow("Skills:", "DermaDefaultBold", Color(200, 200, 200))
+
             for _, weaponClass in pairs(persona.skills) do
                 local weapon = weapons.Get(weaponClass)
                 if weapon then
-                    local lbl = vgui.Create("DLabel", detailFrame)
-                    lbl:SetFont(labelFont)
-                    lbl:SetPos(10, nextY)
                     local txt =
                         (weapon.PrintName or weaponClass) ..
                         " (" .. (weapon.WeaponType or "?") .. ": " .. (weapon.Affinity or "?") .. ")"
@@ -303,12 +278,26 @@ if CLIENT then
                         txt = txt .. " (" .. weapon.HPCost .. " HP):"
                     end
                     txt = txt .. " " .. (weapon.Purpose or "")
-                    local h = CalcWrappedTextHeight(txt, 280, labelFont)
-                    lbl:SetSize(350, h)
-                    lbl:SetWrap(true)
-                    lbl:SetText(txt)
-                    nextY = nextY + h + gap + 10
+                    AddRow(txt)
                 end
+            end
+        end
+
+        if persona.passives and next(persona.passives) then
+            AddRow("Passives:", "DermaDefaultBold", Color(200, 200, 200))
+
+            for passiveKey, _ in pairs(persona.passives) do
+                local passiveData = Passives and Passives[passiveKey]
+
+                local txt
+                if passiveData then
+                    txt = (passiveData.name or passiveKey) .. " (Passive): " ..
+                              (passiveData.description or "")
+                else
+                    txt = passiveKey .. " (Passive)"
+                end
+
+                AddRow(txt)
             end
         end
     end
@@ -458,6 +447,29 @@ if SERVER then
     util.AddNetworkString("ConfirmPersona")
     util.AddNetworkString("SaveLoadout")
 
+    -- One-time cleanup: testing left SavedPersona_citizen / SavedPersona_student_a
+    -- PData behind on a couple of accounts, which made PlayerCharacterSetOnSpawn
+    -- (below) silently re-grant that old persona forever instead of ever asking
+    -- again. Wipes it once per player (tracked by its own PData flag) so the
+    -- picker shows up on their very next spawn as either character.
+    local STALE_SAVED_PERSONA_KEYS = {"SavedPersona_citizen", "SavedPersona_student_a"}
+
+    hook.Add(
+        "PlayerInitialSpawn",
+        "TBC_ClearStaleSavedPersonaMigration",
+        function(ply)
+            if ply:GetPData("TBC_Migration_ClearStalePersona_v1", "") == "1" then
+                return
+            end
+
+            for _, key in ipairs(STALE_SAVED_PERSONA_KEYS) do
+                ply:RemovePData(key)
+            end
+
+            ply:SetPData("TBC_Migration_ClearStalePersona_v1", "1")
+        end
+    )
+
     -- Weapon classnames essence actually granted this character-life. Essence
     -- items go through LoadoutItems[key].class indirection, so their final
     -- classname can't be recognized just by checking charData.loadoutItems
@@ -482,6 +494,57 @@ if SERVER then
             local charId = ply:GetNWString("AssignedCharacter")
             ply:RemovePData("SavedLoadout_" .. charId)
             ply:RemovePData("SavedPersona_" .. charId)
+        end
+    )
+
+    -- Death costs a player their Persona outright: it has to be re-earned,
+    -- same as if they'd dropped the pickup item. Strips the equipped
+    -- persona's skills/passives, wipes persona ownership, and clears the
+    -- saved-persona PData so PlayerSpawn's savedPersona branch below doesn't
+    -- just hand it straight back on respawn.
+    --
+    -- Exception: if the player checked "Save Persona" for their current
+    -- character, that pick survives death too -- PlayerCharacterSetOnSpawn's
+    -- savedPersona branch re-equips it identically on respawn regardless (it
+    -- always strips and re-gives all weapons), so there's nothing to strip
+    -- here and no PData to clear.
+    hook.Add(
+        "PlayerDeath",
+        "TBC_StripPersonaOnDeath",
+        function(victim)
+            if not IsValid(victim) then
+                return
+            end
+
+            local charId = victim:GetNWString("AssignedCharacter")
+            if charId and charId ~= "" and victim:GetPData("SavedPersona_" .. charId) then
+                return
+            end
+
+            local selectedPersona = victim:GetNW2String("selectedPersona", "")
+            local personaData = Personas and Personas[selectedPersona]
+
+            if personaData then
+                for _, weaponClass in pairs(personaData.skills) do
+                    local weapon = victim:GetWeapon(weaponClass)
+                    if IsValid(weapon) then
+                        weapon:Remove()
+                    end
+                end
+
+                TBC_RemovePersonaPassives(victim, personaData)
+            end
+
+            victim:SetNW2String("selectedPersona", "")
+
+            RemoveAllStats(victim, "personas")
+            RemoveAllStats(victim, "permapersonas")
+
+            if charId and charId ~= "" then
+                victim:RemovePData("SavedPersona_" .. charId)
+            end
+
+            victim:ChatPrint("You have died and lost your Persona.")
         end
     )
 
@@ -527,6 +590,9 @@ if SERVER then
                                     AssignStat(ply, itemClass, itemClass, "personas")
                                     AssignStat(ply, itemClass, itemClass, "permapersonas")
                                     ply:SetNW2String("selectedPersona", itemClass)
+
+                                    local persona = Personas and Personas[itemClass]
+                                    TBC_ApplyPersonaPassives(ply, persona)
                                 end
                             )
                         end
@@ -575,6 +641,8 @@ if SERVER then
                         ply:Give(weaponClass)
                     end
 
+                    TBC_ApplyPersonaPassives(ply, persona)
+
                     if saveLoadout then
                         local charId = ply:GetNWString("AssignedCharacter")
                         local personaSkills = {}
@@ -582,7 +650,7 @@ if SERVER then
                             personaSkills[k] = v
                         end
                         personaSkills["persona"] = selectedItem
-                        ply:SetPData("SavedPersona_" .. charId, util.TableToJSON(persona.skills))
+                        ply:SetPData("SavedPersona_" .. charId, util.TableToJSON(personaSkills))
                     end
                 end
             end

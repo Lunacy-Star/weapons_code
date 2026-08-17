@@ -11,6 +11,20 @@ local DamageDealerStatusHandlers = {
 
         return damage
     end,
+    -- Inugami's persona-exclusive Tarukaja. Stronger than the universal
+    -- Tarukaja (0.2x per stack instead of 0.1x), so it's tracked as its own
+    -- buff rather than reusing the shared "Tarukaja" key.
+    Tarukaja_Inugami = function(ply, effectsTable, properties, damage)
+        local weapon = ply:GetActiveWeapon()
+
+        if IsValid(weapon) then
+            if not weapon.WeaponType == "Combat Tactic" then
+                return math.ceil((damage) * (1 + 0.2 * properties.stacks))
+            end
+        end
+
+        return damage
+    end,
     Baton_Pass = function(ply, effectsTable, properties, damage)
         timer.Create(
             "Baton_Pass",
@@ -22,35 +36,6 @@ local DamageDealerStatusHandlers = {
         )
 
         return math.ceil(damage * 1.1)
-    end,
-    Sleep = function(ply, effectsTable, properties, damage)
-        if ply then
-            local weapon = ply:GetActiveWeapon()
-
-            if IsValid(weapon) then
-                local weaponClass = weapon:GetClass()
-                if weapon.Affinity and table.HasValue(Affinities["Physical"], weapon.Affinity) then
-                    timer.Create(
-                        "Sleep",
-                        1,
-                        1,
-                        function()
-                            local userBuffsTable = GetAllStats(ply, "buffs")
-
-                            if userBuffsTable["Sleep"] then
-                                RemoveStat(ply, "Sleep", "buffs")
-                                userBuffsTable["Sleep"] = nil
-                            end
-                        end
-                    )
-
-                    weapon:AnnounceMessage(effectsTable["target"]:Name() .. " is awoken!")
-
-                    return math.ceil((damage) * (1.25))
-                end
-            end
-        end
-        return damage
     end,
     Fire_Boost = function(ply, effectsTable, properties, damage)
         if ply then
@@ -117,6 +102,19 @@ local DamageDealerStatusHandlers = {
         end
         return damage
     end,
+    Light_Boost = function(ply, effectsTable, properties, damage)
+        if ply then
+            local weapon = ply:GetActiveWeapon()
+
+            if IsValid(weapon) then
+                local weaponClass = weapon:GetClass()
+                if weapon.Affinity and weapon.Affinity == "Light" then
+                    return math.ceil((damage) + (10))
+                end
+            end
+        end
+        return damage
+    end,
     Sabbath = function(ply, effectsTable, properties, damage)
         if effectsTable["state"] == "weak" or effectsTable["state"] == "crit" then
             return damage + (10 * properties.stacks)
@@ -128,6 +126,110 @@ local DamageDealerStatusHandlers = {
             local message = ply:Name() .. " triggers the Sabbath and deals extra damage!"
 
             weapon:AnnounceMessage(message)
+        end
+
+        return damage
+    end,
+    Mountain_Guardian = function(ply, effectsTable, properties, damage)
+        if not IsValid(ply) then
+            return damage
+        end
+
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or not weapon.FightId then
+            return damage
+        end
+
+        local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+        if not fight then
+            return damage
+        end
+
+        local side
+        if table.HasValue(fight.Side1, ply) then
+            side = fight.Side1
+        elseif table.HasValue(fight.Side2, ply) then
+            side = fight.Side2
+        end
+
+        if not side then
+            return damage
+        end
+
+        local teamRakundaCount = 0
+        for _, member in ipairs(side) do
+            if IsValid(member) then
+                local memberDebuffs = GetAllStats(member, "debuffs")
+                if memberDebuffs["Rakunda"] then
+                    teamRakundaCount = teamRakundaCount + (memberDebuffs["Rakunda"].stacks or 0)
+                end
+            end
+        end
+
+        if teamRakundaCount <= 0 then
+            return damage
+        end
+
+        local bonus = teamRakundaCount * 1.5
+
+        if weapon.Targets == "aoe" then
+            bonus = bonus / 2
+        end
+
+        bonus = math.ceil(bonus)
+
+        weapon:AnnounceMessage(ply:Name() .. "'s Mountain Guardian deals " .. bonus .. " bonus Almighty damage!")
+
+        return damage + bonus
+    end,
+    Pungent_Goo = function(ply, effectsTable, properties, damage)
+        local isPhysical =
+            effectsTable["Affinity"] == "Physical" or table.HasValue(Affinities.Physical, effectsTable["Affinity"])
+
+        local dealtDamage =
+            effectsTable["state"] == "normal" or effectsTable["state"] == "weak" or effectsTable["state"] == "crit"
+
+        if isPhysical and dealtDamage and math.random(1, 100) <= 35 then
+            local target = effectsTable["target"]
+
+            if IsValid(target) then
+                local targetDebuffsTable = GetAllStats(target, "debuffs")
+
+                if targetDebuffsTable["Sukunda"] then
+                    targetDebuffsTable["Sukunda"].stacks = math.min(targetDebuffsTable["Sukunda"].stacks + 1, 4)
+                else
+                    targetDebuffsTable["Sukunda"] = {stacks = 1}
+                end
+
+                AssignStat(target, "Sukunda", targetDebuffsTable["Sukunda"], "debuffs")
+
+                local weapon = ply:GetActiveWeapon()
+
+                if IsValid(weapon) then
+                    weapon:AnnounceMessage(target:Name() .. " is inflicted with Sukunda by Pungent Goo!")
+                end
+            end
+        end
+
+        return damage
+    end,
+    Crippling_Blow = function(ply, effectsTable, properties, damage)
+        if effectsTable["state"] == "crit" then
+            local target = effectsTable["target"]
+            local targetDebuffsTable = effectsTable["targetDebuffsTable"]
+
+            if IsValid(target) and targetDebuffsTable and targetDebuffsTable["Downed"] then
+                if math.random(1, 100) <= 25 then
+                    target:SetNWInt("TBCHP", 0)
+
+                    local weapon = ply:GetActiveWeapon()
+                    if IsValid(weapon) then
+                        weapon:AnnounceMessage(
+                            target:Name() .. " is instantly killed by Matador's Crippling Blow!"
+                        )
+                    end
+                end
+            end
         end
 
         return damage
@@ -537,6 +639,35 @@ local DamageDealerStatusHandlers = {
         end
         return damage
     end,
+    Power_Charge_Boss = function(ply, effectsTable, properties, damage)
+        if ply then
+            local weapon = ply:GetActiveWeapon()
+
+            if IsValid(weapon) then
+                if not weapon.WeaponType == "Combat Tactic" then
+                    if weapon.Affinity and (weapon.Affinity == "Physical" or
+                        table.HasValue(Affinities["Physical"], weapon.Affinity)) then
+                        timer.Create(
+                            "Power_Charge_Boss",
+                            1,
+                            1,
+                            function()
+                                local userBuffsTable = GetAllStats(ply, "buffs")
+
+                                if userBuffsTable["Power_Charge_Boss"] then
+                                    RemoveStat(ply, "Power_Charge_Boss", "buffs")
+                                    userBuffsTable["Power_Charge_Boss"] = nil
+                                end
+                            end
+                        )
+
+                        return math.ceil((damage) * (1.4))
+                    end
+                end
+            end
+        end
+        return damage
+    end,
     Mind_Charge = function(ply, effectsTable, properties, damage)
         if ply then
             local weapon = ply:GetActiveWeapon()
@@ -560,6 +691,34 @@ local DamageDealerStatusHandlers = {
                         )
 
                         return math.ceil((damage) * (1.25))
+                    end
+                end
+            end
+        end
+        return damage
+    end,
+    Mind_Charge_Boss = function(ply, effectsTable, properties, damage)
+        if ply then
+            local weapon = ply:GetActiveWeapon()
+
+            if IsValid(weapon) then
+                if not weapon.WeaponType == "Combat Tactic" then
+                    if weapon.Affinity and table.HasValue(Affinities["Magic"], weapon.Affinity) then
+                        timer.Create(
+                            "Mind_Charge_Boss",
+                            1,
+                            1,
+                            function()
+                                local userBuffsTable = GetAllStats(ply, "buffs")
+
+                                if userBuffsTable["Mind_Charge_Boss"] then
+                                    RemoveStat(ply, "Mind_Charge_Boss", "buffs")
+                                    userBuffsTable["Mind_Charge_Boss"] = nil
+                                end
+                            end
+                        )
+
+                        return math.ceil((damage) * (1.4))
                     end
                 end
             end
@@ -905,6 +1064,20 @@ local DamageDecreaseStatusHandlers = {
 
         return damage
     end,
+    -- Hua Po's persona-exclusive Tarunda. Stronger than the universal
+    -- Tarunda (0.2x per stack instead of 0.1x), so it's tracked as its own
+    -- debuff rather than reusing the shared "Tarunda" key.
+    Tarunda_HuaPo = function(ply, effectsTable, properties, damage)
+        local weapon = ply:GetActiveWeapon()
+
+        if IsValid(weapon) then
+            if not weapon.WeaponType == "Combat Tactic" then
+                return math.floor((damage) * (1 - 0.2 * properties.stacks))
+            end
+        end
+
+        return damage
+    end,
     Panic = function(ply, effectsTable, properties, damage)
         return math.floor((damage) * (1 - 0.2))
     end,
@@ -1012,6 +1185,16 @@ local DamageDefenseStatusHandlers = {
 local DefenseDecreaseStatusHandlers = {
     Rakunda = function(ply, effectsTable, properties, damage)
         return math.ceil((damage) * (1 + 0.1 * properties.stacks))
+    end,
+    Sleep = function(ply, effectsTable, properties, damage)
+        RemoveStat(ply, "Sleep", "debuffs")
+
+        local weapon = ply:GetActiveWeapon()
+        if IsValid(weapon) then
+            weapon:AnnounceMessage(ply:Name() .. " is awoken!")
+        end
+
+        return math.ceil((damage) * (1.25))
     end
 }
 
@@ -1271,6 +1454,36 @@ local IncreaseLuckStatusHandlers = {
             end
         end
         return totalLuck
+    end,
+    Ward_Off_Evil = function(ply, luck, properties)
+        if not IsValid(ply) then return luck end
+
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or not weapon.FightId then return luck end
+
+        local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+        if not fight then return luck end
+
+        local side
+        if table.HasValue(fight.Side1, ply) then
+            side = fight.Side1
+        elseif table.HasValue(fight.Side2, ply) then
+            side = fight.Side2
+        end
+
+        if not side then return luck end
+
+        for _, member in ipairs(side) do
+            if IsValid(member) and member:GetNWInt("TBCHP", 0) > 0 then
+                local charId = member:GetNWString("AssignedCharacter")
+                local charData = CHARACTERS.List[charId]
+                if charData and charData.variantGroup == "shiki_ouji" then
+                    return luck + 4
+                end
+            end
+        end
+
+        return luck
     end
 }
 
@@ -1481,6 +1694,13 @@ local IncreaseAilmentReceiveStatusHandlers = {}
 local DecreaseAilmentReceiveStatusHandlers = {
     Shield_Deployment = function(ply, chance, properties, targetEffects)
         return (1000)
+    end,
+    Succubus_Allure = function(ply, chance, properties, targetEffects)
+        local ailment = targetEffects and targetEffects["ailment"]
+        if ailment == "Charm" or ailment == "Sleep" then
+            return 1000
+        end
+        return chance
     end
 }
 
@@ -1506,6 +1726,82 @@ local DeathStateStatusHandlers = {
         end
 
         return "alive"
+    end
+}
+
+-- On Death statuses (fired on the dying entity's own buffs right before they're wiped)
+
+local OnDeathStatusHandlers = {
+    Songbird_Obituary = function(ply, effectsTable, properties)
+        if not IsValid(ply) then
+            return
+        end
+
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or not weapon.FightId then
+            return
+        end
+
+        local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+        if not fight then
+            return
+        end
+
+        local side
+        if table.HasValue(fight.Side1, ply) then
+            side = fight.Side1
+        elseif table.HasValue(fight.Side2, ply) then
+            side = fight.Side2
+        end
+
+        if not side then
+            return
+        end
+
+        -- Snapshot before touching anything else, since death/cleanup hooks can mutate the side arrays.
+        local sideMembers = {}
+        for _, member in ipairs(side) do
+            table.insert(sideMembers, member)
+        end
+
+        local huaPoCount = 0
+        for _, member in ipairs(sideMembers) do
+            if IsValid(member) then
+                local charId = member:GetNWString("AssignedCharacter")
+                local charData = CHARACTERS.List[charId]
+                if charData and charData.variantGroup == "hua_po" then
+                    huaPoCount = huaPoCount + 1
+                end
+            end
+        end
+
+        local rakukajaStacks = (huaPoCount <= 1) and 3 or 1
+
+        for _, member in ipairs(sideMembers) do
+            if IsValid(member) and member ~= ply and member:GetNWInt("TBCHP", 0) > 0 then
+                local memberBuffs = GetAllStats(member, "buffs")
+                local existingRakukaja = memberBuffs["Rakukaja"]
+                local currentStacks = (existingRakukaja and existingRakukaja.stacks) or 0
+                local newStacks = math.min(currentStacks + rakukajaStacks, 4)
+
+                AssignStat(member, "Rakukaja", {stacks = newStacks}, "buffs")
+
+                for _, ailment in ipairs(Ailments_Statuses.Ailments) do
+                    RemoveStat(member, ailment, "debuffs")
+                end
+
+                if member:IsPlayer() then
+                    member:ChatPrint(
+                        "Hua Po's Songbird's Obituary grants you Rakukaja +" ..
+                            rakukajaStacks .. " and cures your ailments!"
+                    )
+                end
+            end
+        end
+
+        weapon:AnnounceMessage(ply:Name() .. "'s Songbird's Obituary echoes through the party!")
+
+        return true
     end
 }
 
@@ -1547,6 +1843,43 @@ local KillStatusHandlers = {
                 end
             end
         end
+
+        return true
+    end,
+    Pilfer_Courage = function(ply, state, properties)
+        if not IsValid(ply) then return true end
+
+        if math.random(1, 100) > 30 then return true end
+
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or not weapon.FightId then return true end
+
+        local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+        if not fight then return true end
+
+        local enemySide
+        if table.HasValue(fight.Side1, ply) then
+            enemySide = fight.Side2
+        elseif table.HasValue(fight.Side2, ply) then
+            enemySide = fight.Side1
+        end
+
+        if not enemySide then return true end
+
+        local sideMembers = {}
+        for _, member in ipairs(enemySide) do table.insert(sideMembers, member) end
+
+        for _, member in ipairs(sideMembers) do
+            if IsValid(member) and member:GetNWInt("TBCHP", 0) > 0 then
+                local memberDebuffs = GetAllStats(member, "debuffs")
+
+                memberDebuffs["Panic"] = {stacks = 1, wearOff = "turnWearOff", duration = 3}
+
+                AssignStat(member, "Panic", memberDebuffs["Panic"], "debuffs")
+            end
+        end
+
+        weapon:AnnounceMessage(ply:Name() .. "'s Pilfer Courage sends the enemy team into a Panic!")
 
         return true
     end
@@ -1595,6 +1928,20 @@ local VictoryStatusHandlers = {
 
 -- Reaction Heal statuses
 
+local function EntityQualifiesForIceHoard(ent)
+    if not IsValid(ent) then
+        return false
+    end
+
+    local resist = util.JSONToTable(ent:GetNW2String("resist")) or {}
+    local block = util.JSONToTable(ent:GetNW2String("block")) or {}
+    local drain = util.JSONToTable(ent:GetNW2String("drain")) or {}
+    local repel = util.JSONToTable(ent:GetNW2String("repel")) or {}
+
+    return table.HasValue(resist, "Ice") or table.HasValue(block, "Ice") or table.HasValue(drain, "Ice") or
+        table.HasValue(repel, "Ice")
+end
+
 local ReactionHealStatusHandlers = {
     Papillon_Heart = function(ply, effectsTable, properties)
         if effectsTable["ply"] ~= effectsTable["target"] then
@@ -1633,6 +1980,121 @@ local ReactionHealStatusHandlers = {
 
             self:AnnounceMessage(message)
         end
+        return true
+    end,
+    Bouncy_Body = function(ply, effectsTable, properties)
+        if effectsTable["_bouncyBodyProcessed"] then
+            return true
+        end
+        effectsTable["_bouncyBodyProcessed"] = true
+
+        local target = effectsTable["target"]
+        if not IsValid(target) then
+            return true
+        end
+
+        local buffsTable = GetAllStats(target, "buffs")
+        local currentStacks = (buffsTable["Sukukaja"] and buffsTable["Sukukaja"].stacks) or 0
+        local newStacks = math.min(currentStacks + 1, 4)
+
+        AssignStat(target, "Sukukaja", {stacks = newStacks}, "buffs")
+
+        local weapon = target:GetActiveWeapon()
+        if IsValid(weapon) then
+            weapon:AnnounceMessage(target:Name() .. "'s Bouncy Body grants +1 Sukukaja! (" .. newStacks .. " stacks)")
+        end
+
+        return true
+    end,
+    Acid_Body = function(ply, effectsTable, properties)
+        if effectsTable["_acidBodyProcessed"] then
+            return true
+        end
+        effectsTable["_acidBodyProcessed"] = true
+
+        local target = effectsTable["target"]
+        if not IsValid(target) then
+            return true
+        end
+
+        local buffsTable = GetAllStats(target, "buffs")
+        local currentStacks = (buffsTable["Tarukaja"] and buffsTable["Tarukaja"].stacks) or 0
+        local newStacks = math.min(currentStacks + 1, 4)
+
+        AssignStat(target, "Tarukaja", {stacks = newStacks}, "buffs")
+
+        local weapon = target:GetActiveWeapon()
+        if IsValid(weapon) then
+            weapon:AnnounceMessage(target:Name() .. "'s Acid Body grants +1 Tarukaja! (" .. newStacks .. " stacks)")
+        end
+
+        return true
+    end,
+    Ice_Hoard = function(ply, effectsTable, properties)
+        if not IsValid(ply) then
+            return true
+        end
+
+        local target = effectsTable["target"]
+        if not IsValid(target) or target == ply then
+            return true
+        end
+
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) then
+            return true
+        end
+
+        if EntityQualifiesForIceHoard(target) then
+            local plyHP = ply:GetNWInt("TBCHP", 0)
+            local maxHP = ply:GetNWInt("TBCMAXHP", 50)
+
+            plyHP = math.min(plyHP + 20, maxHP)
+            ply:SetNWInt("TBCHP", plyHP)
+
+            weapon:AnnounceMessage(ply:Name() .. "'s Ice Hoard grants +20 HP for healing an Ice-resistant ally!")
+
+            return true
+        end
+
+        if not weapon.FightId then
+            return true
+        end
+
+        local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+        if not fight then
+            return true
+        end
+
+        local side
+        if table.HasValue(fight.Side1, ply) then
+            side = fight.Side1
+        elseif table.HasValue(fight.Side2, ply) then
+            side = fight.Side2
+        end
+
+        if not side then
+            return true
+        end
+
+        local anyoneElseQualifies = false
+        for _, member in ipairs(side) do
+            if IsValid(member) and member ~= ply and EntityQualifiesForIceHoard(member) then
+                anyoneElseQualifies = true
+                break
+            end
+        end
+
+        if not anyoneElseQualifies then
+            local buffsTable = GetAllStats(ply, "buffs")
+            local currentStacks = (buffsTable["Sukukaja"] and buffsTable["Sukukaja"].stacks) or 0
+            local newStacks = math.min(currentStacks + 1, 4)
+
+            AssignStat(ply, "Sukukaja", {stacks = newStacks}, "buffs")
+
+            weapon:AnnounceMessage(ply:Name() .. "'s Ice Hoard grants +1 Sukukaja! (" .. newStacks .. " stacks)")
+        end
+
         return true
     end
 }
@@ -2793,13 +3255,13 @@ function HandleStatus(ply, statusList, statusType, value, effectsTable)
                 local handler = IncreaseAilmentReceiveStatusHandlers[status]
                 -- If a handler was found, call it
                 if handler then
-                    ailmentChance = handler(ply, ailmentChance, properties)
+                    ailmentChance = handler(ply, ailmentChance, properties, effectsTable)
                 end
             elseif statusType == "decreaseAilmentReceive" then
                 local handler = DecreaseAilmentReceiveStatusHandlers[status]
                 -- If a handler was found, call it
                 if handler then
-                    ailmentChance = handler(ply, ailmentChance, properties)
+                    ailmentChance = handler(ply, ailmentChance, properties, effectsTable)
                 end
             end
         end
@@ -2922,6 +3384,14 @@ function HandleStatus(ply, statusList, statusType, value, effectsTable)
         -- If a handler was found, call it
         if handler then
             state = handler(ply, state, false)
+        end
+        return state
+    elseif statusType == "onDeath" then
+        local state = false
+        local handler = OnDeathStatusHandlers[statusList]
+        -- If a handler was found, call it
+        if handler then
+            state = handler(ply, effectsTable, false)
         end
         return state
     elseif statusType == "kill" then

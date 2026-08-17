@@ -46,6 +46,7 @@ function ENT:Use(activator, caller)
 
     targetBuffsTable["Endure"] = {
         stacks = 1,
+        type = "deathState",
         SlotsTaking = 1,
         SlotType = "Equipment",
         ClassName = "smti_endure"

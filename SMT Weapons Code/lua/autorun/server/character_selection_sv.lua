@@ -92,6 +92,7 @@ function ApplyCharacterToPlayer(ply, charID, modelPath)
     if character.permaBuffs then
         for status, properties in pairs(character.permaBuffs) do
             AssignStat(ply, status, properties, "permabuffs")
+            ApplyStatBoostBuff(ply, properties)
         end
     end
 
@@ -355,6 +356,16 @@ hook.Add(
             -- Clear temporary combat buffs/debuffs (perma ones persist)
             RemoveAllStats(ply, "buffs")
             RemoveAllStats(ply, "debuffs")
+
+            -- Max HP/MP was just reset to character defaults above, so
+            -- reapply any stat-boost permabuffs (Life Bonus, Mana Bonus,
+            -- ...) that survived the buffs/debuffs wipe.
+            local permaBuffs = GetAllStats(ply, "permabuffs")
+            if permaBuffs then
+                for _, properties in pairs(permaBuffs) do
+                    ApplyStatBoostBuff(ply, properties)
+                end
+            end
 
             -- Delayed model set to override sandbox
             timer.Simple(

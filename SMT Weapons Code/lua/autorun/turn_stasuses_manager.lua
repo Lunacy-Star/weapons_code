@@ -1,3 +1,37 @@
+local function TriggerBouncyBody(ply)
+    local buffsTable = GetAllStats(ply, "buffs")
+    if not buffsTable["Bouncy_Body"] then
+        return
+    end
+
+    local currentStacks = (buffsTable["Sukukaja"] and buffsTable["Sukukaja"].stacks) or 0
+    local newStacks = math.min(currentStacks + 1, 4)
+
+    AssignStat(ply, "Sukukaja", {stacks = newStacks}, "buffs")
+
+    local weapon = ply:GetActiveWeapon()
+    if IsValid(weapon) then
+        weapon:AnnounceMessage(ply:Name() .. "'s Bouncy Body grants +1 Sukukaja! (" .. newStacks .. " stacks)")
+    end
+end
+
+local function TriggerAcidBody(ply)
+    local buffsTable = GetAllStats(ply, "buffs")
+    if not buffsTable["Acid_Body"] then
+        return
+    end
+
+    local currentStacks = (buffsTable["Tarukaja"] and buffsTable["Tarukaja"].stacks) or 0
+    local newStacks = math.min(currentStacks + 1, 4)
+
+    AssignStat(ply, "Tarukaja", {stacks = newStacks}, "buffs")
+
+    local weapon = ply:GetActiveWeapon()
+    if IsValid(weapon) then
+        weapon:AnnounceMessage(ply:Name() .. "'s Acid Body grants +1 Tarukaja! (" .. newStacks .. " stacks)")
+    end
+end
+
 local TurnDamageStatusHandlers = {
     Burn = function(ply, damage, properties)
         return 10
@@ -23,6 +57,9 @@ local TurnRegenStatusHandlers = {
             local message = ply:Name() .. " Regenerated " .. baseDamage .. " HP!"
 
             weapon:AnnounceMessage(message)
+
+            TriggerBouncyBody(ply)
+            TriggerAcidBody(ply)
         end
     end,
     Invigorate = function(ply, damage, properties)
@@ -40,6 +77,9 @@ local TurnRegenStatusHandlers = {
             local message = ply:Name() .. " Regenerated " .. baseDamage .. " MP!"
 
             weapon:AnnounceMessage(message)
+
+            TriggerBouncyBody(ply)
+            TriggerAcidBody(ply)
         end
     end,
     Auto_Repair = function(ply, damage, properties)
@@ -57,6 +97,9 @@ local TurnRegenStatusHandlers = {
             local message = ply:Name() .. " received " .. baseDamage .. " healing from Auto-Repair!"
 
             weapon:AnnounceMessage(message)
+
+            TriggerBouncyBody(ply)
+            TriggerAcidBody(ply)
         end
     end,
     Lydia = function(ply, damage, properties)
@@ -198,29 +241,202 @@ local TurnSkipStatusHandlers = {
 }
 
 local TurnMiscStatusHandlers = {
-    -- TODO Make the buff actually do the buff thing.
     Tansu_of_Vengeance = function(ply, damage, properties)
         local weapon = ply:GetActiveWeapon()
-        if IsValid(weapon) then
-            local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
-            if fight then
-            else
-                return false
-            end
-
-            local weaponClass = weapon:GetClass()
-            local HPToHeal = ply:GetNWInt("TBCHP", 10)
-            local maxHP = ply:GetNWInt("TBCMAXHP", 100)
-
-            local baseDamage = 10
-
-            local newHP = math.min(HPToHeal + baseDamage, maxHP)
-            ply:SetNWInt("TBCHP", newHP)
-
-            local message = ply:Name() .. " Regenerated " .. baseDamage .. " HP!"
-
-            weapon:AnnounceMessage(message)
+        if not IsValid(weapon) or not weapon.FightId then
+            return false
         end
+
+        local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+        if not fight then
+            return false
+        end
+
+        local side
+        if table.HasValue(fight.Side1, ply) then
+            side = fight.Side1
+        elseif table.HasValue(fight.Side2, ply) then
+            side = fight.Side2
+        end
+
+        if not side then
+            return false
+        end
+
+        local totalAllies = 0
+        local deadAllies = 0
+
+        for _, member in ipairs(side) do
+            if IsValid(member) and member ~= ply then
+                totalAllies = totalAllies + 1
+                if member:GetNWInt("TBCHP", 0) <= 0 then
+                    deadAllies = deadAllies + 1
+                end
+            end
+        end
+
+        local tarukajaGain
+
+        if totalAllies == 0 then
+            -- Inugami started the fight alone: flat +1 Tarukaja every turn.
+            tarukajaGain = 1
+        elseif deadAllies > 0 then
+            tarukajaGain = math.min(deadAllies, 4)
+        else
+            tarukajaGain = 0
+        end
+
+        if tarukajaGain > 0 then
+            local buffsTable = GetAllStats(ply, "buffs")
+            local currentStacks = (buffsTable["Tarukaja"] and buffsTable["Tarukaja"].stacks) or 0
+            local newStacks = math.min(currentStacks + tarukajaGain, 4)
+
+            AssignStat(ply, "Tarukaja", {stacks = newStacks}, "buffs")
+
+            weapon:AnnounceMessage(
+                ply:Name() ..
+                    "'s Tansu of Vengeance grants +" .. tarukajaGain .. " Tarukaja! (" .. newStacks .. " stacks)"
+            )
+        end
+
+        if totalAllies > 0 and (deadAllies >= 4 or deadAllies >= totalAllies) then
+            local debuffsTable = GetAllStats(ply, "debuffs")
+            if debuffsTable["Tarunda"] then
+                RemoveStat(ply, "Tarunda", "debuffs")
+                weapon:AnnounceMessage(ply:Name() .. " is cleansed of Tarunda by Tansu of Vengeance!")
+            end
+        end
+
+        return true
+    end,
+    Succubus_Allure = function(ply, damage, properties)
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or not weapon.FightId then
+            return false
+        end
+
+        local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+        if not fight then
+            return false
+        end
+
+        local afflictedCount = 0
+        for _, sideKey in ipairs({"Side1", "Side2"}) do
+            for _, member in ipairs(fight[sideKey]) do
+                if IsValid(member) then
+                    local memberDebuffs = GetAllStats(member, "debuffs")
+                    if memberDebuffs["Charm"] or memberDebuffs["Sleep"] then
+                        afflictedCount = afflictedCount + 1
+                    end
+                end
+            end
+        end
+
+        if afflictedCount <= 0 then
+            return true
+        end
+
+        local healHP = afflictedCount * 5
+        local healMP = afflictedCount * 10
+
+        local currentHP = ply:GetNWInt("TBCHP", 100)
+        local maxHP = ply:GetNWInt("TBCMAXHP", 100)
+        ply:SetNWInt("TBCHP", math.min(currentHP + healHP, maxHP))
+
+        local currentMP = ply:GetNWInt("TBCMP", 100)
+        local maxMP = ply:GetNWInt("TBCMAXMP", 100)
+        ply:SetNWInt("TBCMP", math.min(currentMP + healMP, maxMP))
+
+        weapon:AnnounceMessage(
+            ply:Name() .. "'s Succubus Allure regenerates " .. healHP .. " HP and " .. healMP .. " MP!"
+        )
+
+        return true
+    end,
+    Minotaur_Cleanse = function(ply, damage, properties)
+        local currentHP = ply:GetNWInt("TBCHP", 0)
+        if currentHP > 1000 then
+            return false
+        end
+
+        if ply.MinotaurCleansed then
+            return false
+        end
+        ply.MinotaurCleansed = true
+
+        RemoveAllStats(ply, "debuffs")
+
+        local weapon = ply:GetActiveWeapon()
+        if IsValid(weapon) then
+            weapon:AnnounceMessage(ply:Name() .. " enters Phase 3 and removes every debuff applied to him!")
+        end
+
+        return true
+    end,
+    Hydra_Cleanse = function(ply, damage, properties)
+        local currentHP = ply:GetNWInt("TBCHP", 0)
+        local maxHP = ply:GetNWInt("TBCMAXHP", 1)
+        if currentHP > maxHP * 0.4 then
+            return false
+        end
+
+        if ply.HydraCleansed then
+            return false
+        end
+        ply.HydraCleansed = true
+
+        RemoveAllStats(ply, "debuffs")
+
+        local weapon = ply:GetActiveWeapon()
+        if IsValid(weapon) then
+            weapon:AnnounceMessage(ply:Name() .. " enters Phase 3 and removes every debuff applied to itself!")
+        end
+
+        return true
+    end,
+    Matador_PhaseDekaja = function(ply, damage, properties)
+        local currentHP = ply:GetNWInt("TBCHP", 0)
+        if currentHP > 1500 then return false end
+
+        if ply.MatadorPhaseDekajaCast then return false end
+        ply.MatadorPhaseDekajaCast = true
+
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or not weapon.FightId then return false end
+
+        local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+        if not fight then return false end
+
+        local enemySide
+        if table.HasValue(fight.Side1, ply) then
+            enemySide = fight.Side2
+        elseif table.HasValue(fight.Side2, ply) then
+            enemySide = fight.Side1
+        end
+
+        if not enemySide then return false end
+
+        local sideMembers = {}
+        for _, member in ipairs(enemySide) do table.insert(sideMembers, member) end
+
+        local buffsToRemove = Ailments_Statuses["Dekaja"]
+
+        for _, member in ipairs(sideMembers) do
+            if IsValid(member) and member:GetNWInt("TBCHP", 0) > 0 then
+                local buffsTable = GetAllStats(member, "buffs")
+
+                for _, buffName in ipairs(buffsToRemove) do
+                    if buffsTable[buffName] then
+                        RemoveStat(member, buffName, "buffs")
+                        buffsTable[buffName] = nil
+                    end
+                end
+            end
+        end
+
+        weapon:AnnounceMessage(ply:Name() .. " enters Phase 3 and casts Dekaja on the enemy team!")
+
+        return true
     end
 }
 
@@ -246,7 +462,7 @@ function HandleTurnStatus(ply, status, statusType, properties)
     elseif statusType == "turnMisc" then
         local state = false
         -- Loop through each status in the list
-        local handler = TurnRegenStatusHandlers[status]
+        local handler = TurnMiscStatusHandlers[status]
         -- If a handler was found, call it
         if handler then
             state = handler(ply, state, properties)

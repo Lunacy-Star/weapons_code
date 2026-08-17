@@ -190,6 +190,7 @@ function ENT:SetupDemon(master, charId, guid, savedState)
     if charData.permaBuffs then
         for status, properties in pairs(charData.permaBuffs) do
             AssignStat(self, status, properties, "permabuffs")
+            ApplyStatBoostBuff(self, properties)
         end
     end
     if charData.permaDebuffs then

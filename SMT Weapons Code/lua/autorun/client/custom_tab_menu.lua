@@ -256,6 +256,48 @@ function OpenPersonaDetailWindow(anchorFrame, persona)
             skillPanel:SetTall((draw.GetFontHeight("DermaDefault") * lines) + 20)
         end
     end
+
+    -- Passives
+    if personaData.passives and next(personaData.passives) then
+        local passivesHeader = vgui.Create("DLabel", scroll)
+        passivesHeader:Dock(TOP)
+        passivesHeader:SetText("Passives:")
+        passivesHeader:SetFont("DermaDefaultBold")
+        passivesHeader:SetTextColor(Color(200, 200, 200))
+        passivesHeader:DockMargin(0, 10, 0, 5)
+
+        for passiveKey, _ in pairs(personaData.passives) do
+            local passiveData = Passives and Passives[passiveKey]
+
+            local passivePanel = vgui.Create("DPanel", scroll)
+            passivePanel:Dock(TOP)
+            passivePanel:DockMargin(5, 2, 5, 2)
+            passivePanel.Paint = function() end
+
+            local passiveText
+            if passiveData then
+                passiveText = (passiveData.name or passiveKey) .. " (Passive)"
+                if passiveData.description and passiveData.description ~= "" then
+                    passiveText = passiveText .. "\n" .. passiveData.description
+                end
+            else
+                passiveText = passiveKey .. " (Passive)"
+            end
+
+            local passiveLabel = vgui.Create("DLabel", passivePanel)
+            passiveLabel:Dock(FILL)
+            passiveLabel:SetText(passiveText)
+            passiveLabel:SetTextColor(Color(220, 220, 220))
+            passiveLabel:SetFont("DermaDefault")
+            passiveLabel:SetWrap(true)
+            passiveLabel:SetAutoStretchVertical(true)
+            passiveLabel:DockMargin(5, 5, 5, 5)
+
+            local lines = 1
+            for _ in string.gmatch(passiveText, "\n") do lines = lines + 1 end
+            passivePanel:SetTall((draw.GetFontHeight("DermaDefault") * lines) + 20)
+        end
+    end
 end
 
 -- ================================================================
@@ -519,6 +561,10 @@ function PANEL:LoadPlayerContent()
         else
             DataRow("Character", "None assigned", Color(150, 150, 150))
         end
+
+        DataRow("STR", ply:GetNWInt("TBCSTR", 0), Color(230, 140, 140))
+        DataRow("DEX", ply:GetNWInt("TBCDEX", 0), Color(140, 220, 180))
+        DataRow("CHR", ply:GetNWInt("TBCCHR", 0), Color(220, 180, 230))
 
         if TBC_CURRENCY then
             local cfg = TBC_CURRENCY.LocalConfig or {}
@@ -1854,44 +1900,72 @@ function PANEL:ShowVariantGroup(groupName, variants, startIndex, selectedModel)
     end
 
     if character.weapons and #character.weapons > 0 then
-        local weaponNames = {}
+        local weaponEntries = {}
         for _, weaponClass in ipairs(character.weapons) do
             local wepData     = weapons and weapons.Get and weapons.Get(weaponClass)
             local passiveData = not wepData and Passives and Passives[weaponClass]
             if type(passiveData) ~= "table" then passiveData = nil end
 
+            local entry
             if passiveData then
-                table.insert(weaponNames, passiveData.name .. " (Passive)")
+                entry = passiveData.name .. " (Passive)"
+                if passiveData.description and passiveData.description ~= "" then
+                    entry = entry .. "\n" .. passiveData.description
+                end
             elseif wepData then
-                table.insert(weaponNames, wepData.PrintName or weaponClass)
+                entry = wepData.PrintName or weaponClass
+                if wepData.Purpose and wepData.Purpose ~= "" then
+                    entry = entry .. "\n" .. wepData.Purpose
+                end
             else
-                table.insert(weaponNames, weaponClass)
+                entry = weaponClass
             end
+            table.insert(weaponEntries, entry)
         end
         SectionHeader("Weapons & Skills:")
-        SectionBody(table.concat(weaponNames, "\n"))
+        SectionBody(table.concat(weaponEntries, "\n\n"))
     end
 
     if character.loadoutItems and #character.loadoutItems > 0 then
-        local loadoutNames = {}
+        local loadoutEntries = {}
         for _, itemClass in ipairs(character.loadoutItems) do
-            local n = itemClass
+            local entry = itemClass
             if LoadoutItems and LoadoutItems[itemClass] then
-                n = LoadoutItems[itemClass].name
+                entry = LoadoutItems[itemClass].name
+                if LoadoutItems[itemClass].description and LoadoutItems[itemClass].description ~= "" then
+                    entry = entry .. "\n" .. LoadoutItems[itemClass].description
+                end
             elseif Personas and Personas[itemClass] then
-                n = Personas[itemClass].name
+                entry = Personas[itemClass].name
+                if Personas[itemClass].description and Personas[itemClass].description ~= "" then
+                    entry = entry .. "\n" .. Personas[itemClass].description
+                end
             end
-            if n then table.insert(loadoutNames, n) end
+            table.insert(loadoutEntries, entry)
         end
         SectionHeader("Loadout Items:")
-        SectionBody(table.concat(loadoutNames, "\n"))
+        SectionBody(table.concat(loadoutEntries, "\n\n"))
     end
 
     if character.permaBuffs and table.Count(character.permaBuffs) > 0 then
-        local names = {}
-        for buffName, _ in pairs(character.permaBuffs) do table.insert(names, buffName) end
+        local entries = {}
+        for buffName, _ in pairs(character.permaBuffs) do
+            local passiveData = Passives and Passives[buffName]
+            if type(passiveData) ~= "table" then passiveData = nil end
+
+            local entry
+            if passiveData then
+                entry = passiveData.name .. " (Passive)"
+                if passiveData.description and passiveData.description ~= "" then
+                    entry = entry .. "\n" .. passiveData.description
+                end
+            else
+                entry = buffName
+            end
+            table.insert(entries, entry)
+        end
         SectionHeader("Permanent Passives:")
-        SectionBody(table.concat(names, "\n"))
+        SectionBody(table.concat(entries, "\n\n"))
     end
 
     -- ---- Shared model viewer + selector (same for every variant) ----
@@ -2169,7 +2243,7 @@ function PANEL:ShowCharacterDetails(character, charID)
             if wepData or passiveData then
                 local weaponPanel = vgui.Create("DPanel", scroll)
                 weaponPanel:Dock(TOP)
-                weaponPanel:DockMargin(5, 2, 5, 2)
+                weaponPanel:DockMargin(0, 2, 0, 2)
                 weaponPanel.Paint = function() end
 
                 local weaponText = ""
@@ -2199,7 +2273,7 @@ function PANEL:ShowCharacterDetails(character, charID)
                 weaponLabel:SetTextColor(Color(220, 220, 220))
                 weaponLabel:SetWrap(true)
                 weaponLabel:SetAutoStretchVertical(true)
-                weaponLabel:DockMargin(5, 5, 5, 5)
+                weaponLabel:DockMargin(0, 5, 0, 5)
 
                 local lines = 1
                 for _ in string.gmatch(weaponText, "\n") do lines = lines + 1 end
@@ -2207,7 +2281,7 @@ function PANEL:ShowCharacterDetails(character, charID)
             else
                 local weaponPanel = vgui.Create("DPanel", scroll)
                 weaponPanel:Dock(TOP)
-                weaponPanel:DockMargin(5, 2, 5, 2)
+                weaponPanel:DockMargin(0, 2, 0, 2)
                 weaponPanel.Paint = function() end
 
                 local weaponLabel = vgui.Create("DLabel", weaponPanel)
@@ -2216,7 +2290,7 @@ function PANEL:ShowCharacterDetails(character, charID)
                 weaponLabel:SetTextColor(Color(220, 220, 220))
                 weaponLabel:SetAutoStretchVertical(true)
                 weaponLabel:SetWrap(true)
-                weaponLabel:DockMargin(5, 5, 5, 5)
+                weaponLabel:DockMargin(0, 5, 0, 5)
 
                 weaponPanel:SizeToChildren(false, true)
                 weaponPanel:SetTall(weaponPanel:GetTall() + 10)
@@ -2239,30 +2313,38 @@ function PANEL:ShowCharacterDetails(character, charID)
 
         local loadoutItemsArray = {}
         for _, itemClass in ipairs(character.loadoutItems) do
-            local n = itemClass
+            local entry = itemClass
             if LoadoutItems and LoadoutItems[itemClass] then
-                n = LoadoutItems[itemClass].name
+                entry = LoadoutItems[itemClass].name
+                if LoadoutItems[itemClass].description and LoadoutItems[itemClass].description ~= "" then
+                    entry = entry .. "\n" .. LoadoutItems[itemClass].description
+                end
             elseif Personas and Personas[itemClass] then
-                n = Personas[itemClass].name
+                entry = Personas[itemClass].name
+                if Personas[itemClass].description and Personas[itemClass].description ~= "" then
+                    entry = entry .. "\n" .. Personas[itemClass].description
+                end
             end
-            if n then table.insert(loadoutItemsArray, n) end
+            table.insert(loadoutItemsArray, entry)
         end
 
         local itemPanel = vgui.Create("DPanel", scroll)
         itemPanel:Dock(TOP)
-        itemPanel:DockMargin(5, 2, 5, 2)
+        itemPanel:DockMargin(0, 2, 0, 2)
         itemPanel.Paint = function() end
+
+        local itemText = table.concat(loadoutItemsArray, "\n\n")
 
         local itemLabel = vgui.Create("DLabel", itemPanel)
         itemLabel:Dock(FILL)
-        itemLabel:SetText(table.concat(loadoutItemsArray, "\n"))
+        itemLabel:SetText(itemText)
         itemLabel:SetTextColor(Color(220, 220, 220))
         itemLabel:SetAutoStretchVertical(true)
         itemLabel:SetWrap(true)
-        itemLabel:DockMargin(5, 5, 5, 5)
+        itemLabel:DockMargin(0, 5, 0, 5)
 
         local lines = 1
-        for _ in string.gmatch(table.concat(loadoutItemsArray, "\n"), "\n") do lines = lines + 1 end
+        for _ in string.gmatch(itemText, "\n") do lines = lines + 1 end
         itemPanel:SetTall((draw.GetFontHeight(itemLabel:GetFont()) * lines) + 20)
 
         local spacer = vgui.Create("DPanel", scroll)
@@ -2287,7 +2369,7 @@ function PANEL:ShowCharacterDetails(character, charID)
 
             local panel = vgui.Create("DPanel", scroll)
             panel:Dock(TOP)
-            panel:DockMargin(5, 2, 5, 2)
+            panel:DockMargin(0, 2, 0, 2)
             panel.Paint = function() end
 
             local txt = ""
@@ -2307,7 +2389,7 @@ function PANEL:ShowCharacterDetails(character, charID)
             lbl:SetTextColor(Color(220, 220, 220))
             lbl:SetAutoStretchVertical(true)
             lbl:SetWrap(true)
-            lbl:DockMargin(5, 5, 5, 5)
+            lbl:DockMargin(0, 5, 0, 5)
 
             local lines = 1
             for _ in string.gmatch(txt, "\n") do lines = lines + 1 end
@@ -2534,6 +2616,73 @@ function PANEL:LoadSettingsContent()
     SettingCheckbox("Show battle announcements in chat", "smt_chatprint_showchat")
     SettingCheckbox("Show battle announcement blocks on screen", "smt_chatprint_showblocks")
     SettingCheckbox("Show other party notifications", "smt_chatprint_shownearby")
+
+    -- ================================================================
+    --  Music (mirrors the "Nara Configuration" Q-menu panel in
+    --  cl_battle_music.lua, so players don't have to leave this menu)
+    -- ================================================================
+    local MUSIC_LABEL_W = 200
+
+    local function SettingComboBox(text, convar, choices, onSelectExtra)
+        local row = vgui.Create("DPanel", self.Content)
+        row:Dock(TOP)
+        row:SetTall(34)
+        row:DockMargin(10, 2, 10, 2)
+        row.Paint = function(s, w, h)
+            draw.RoundedBox(3, 0, 0, w, h, Color(45, 45, 45, 200))
+        end
+
+        local lbl = vgui.Create("DLabel", row)
+        lbl:Dock(LEFT)
+        lbl:SetText(text)
+        lbl:SetTextColor(Color(160, 160, 160))
+        lbl:SetWide(MUSIC_LABEL_W)
+        lbl:DockMargin(10, 0, 0, 0)
+
+        local combo = vgui.Create("DComboBox", row)
+        combo:Dock(FILL)
+        combo:DockMargin(10, 5, 10, 5)
+
+        local current = GetConVar(convar):GetString()
+        for title, path in pairs(choices) do
+            combo:AddChoice(title, path)
+            if title == current then combo:SetValue(title) end
+        end
+
+        combo.OnSelect = function(_, _, value)
+            RunConsoleCommand(convar, value)
+            if onSelectExtra then onSelectExtra(value) end
+        end
+
+        return combo
+    end
+
+    SectionHeader("Music")
+
+    SettingComboBox("Battle Music", "selected_battle_music",
+                    SMT_AvailableBattleMusic, function()
+        if SMT_MusicState.InFight then PlayBattleMusic() end
+    end)
+    SettingComboBox("Victory Music", "selected_victory_music",
+                    SMT_AvailableVictoryMusic)
+
+    local volumeRow = vgui.Create("DPanel", self.Content)
+    volumeRow:Dock(TOP)
+    volumeRow:SetTall(34)
+    volumeRow:DockMargin(10, 2, 10, 2)
+    volumeRow.Paint = function(s, w, h)
+        draw.RoundedBox(3, 0, 0, w, h, Color(45, 45, 45, 200))
+    end
+
+    local volumeSlider = vgui.Create("DNumSlider", volumeRow)
+    volumeSlider:Dock(FILL)
+    volumeSlider:DockMargin(5, 2, 10, 2)
+    volumeSlider:SetText("Music Volume (Battle + Area)")
+    volumeSlider:SetMin(0)
+    volumeSlider:SetMax(1)
+    volumeSlider:SetDecimals(2)
+    volumeSlider:SetConVar("music_volume")
+    volumeSlider:SetValue(GetConVar("music_volume"):GetFloat())
 end
 
 vgui.Register("CustomTabMenu", PANEL, "DFrame")

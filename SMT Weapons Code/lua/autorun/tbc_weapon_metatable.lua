@@ -321,6 +321,27 @@ function TBCWeaponMetatable:AilmentCheck(player, turnType)
             end
         end
 
+        if properties.type == "sleep" then
+            HandleTurnStatus(player, status, "turnSkipper", properties)
+
+            if properties.duration then
+                userDebuffsTable[status].duration = userDebuffsTable[status].duration - 1
+                if properties.duration <= 0 then
+                    userDebuffsTable[status] = nil
+                end
+
+                AssignStat(player, status, userDebuffsTable[status], "debuffs")
+            end
+
+            self:AnnounceMessage(player:Name() .. " is fast asleep and skips their turn!")
+
+            if userDebuffsTable[status] == nil then
+                self:AnnounceMessage(player:Name() .. "'s " .. status .. " has worn off!")
+            end
+
+            self:NextTurn(true)
+        end
+
         if properties.wearOff == "turnWearOff" then
             local playerLuck = player:GetNWInt("TBCLuck", 10)
             playerLuck =
@@ -338,7 +359,7 @@ function TBCWeaponMetatable:AilmentCheck(player, turnType)
             end
         end
 
-        if properties.type ~= "turnDamage" and properties.type ~= "turnSkipper" then
+        if properties.type ~= "turnDamage" and properties.type ~= "turnSkipper" and properties.type ~= "sleep" then
             if properties.duration and userDebuffsTable[status] then
                 userDebuffsTable[status].duration = userDebuffsTable[status].duration - 1
                 if properties.duration <= 0 then
@@ -869,6 +890,60 @@ function TBCWeaponMetatable:NextTurn(timerSkip)
     end
 end
 
+-- Advances the active member to the next party member on the current side,
+-- exactly like NextTurn, but does NOT spend from fight.TurnCounter. Used by
+-- abilities that let a character pass their turn for free (e.g. Tag).
+function TBCWeaponMetatable:FreeNextTurn()
+    local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
+    if not fight then
+        self.Owner:ChatPrint("Fight not found.")
+        return
+    end
+
+    local currentActiveSide = fight.ActiveSide
+
+    if timer.Exists(self.FightId) then
+        timer.Start(self.FightId)
+    else
+        timer.Create(
+            self.FightId,
+            180,
+            0,
+            function()
+                self:AnnounceMessage("Time's up! Skipping turn.")
+                self:NextTurn(true)
+                fight.AFKRequests = {}
+            end
+        )
+    end
+
+    if SERVER then
+        local currentTurnPlayer = fight[currentActiveSide][fight.ActiveMember]
+        RemoveStat(currentTurnPlayer, "One_More", "buffs")
+        RemoveStat(currentTurnPlayer, "Baton_Pass", "buffs")
+    end
+
+    fight.ActiveMember = fight.ActiveMember + 1
+    if fight.ActiveMember > #fight[currentActiveSide] then
+        fight.ActiveMember = 1
+    end
+
+    for _, player in ipairs(fight.Side1) do
+        if IsValid(player) then player:EmitSound("common/stuck1.wav") end
+    end
+
+    for _, player in ipairs(fight.Side2) do
+        if IsValid(player) then player:EmitSound("common/stuck1.wav") end
+    end
+
+    if SERVER then
+        local nextTurnPlayer = fight[currentActiveSide][fight.ActiveMember]
+        self:AnnounceMessage("It's " .. nextTurnPlayer:Name() .. "'s turn!")
+        self:AilmentCheck(nextTurnPlayer, "turn")
+        fight.AFKRequests = {}
+    end
+end
+
 function TBCWeaponMetatable:EndFight()
     TBCWeaponMetatable.OngoingFights[self.FightId] = nil
     self.FightId = nil
@@ -1005,6 +1080,47 @@ function TBCWeaponMetatable:CheckForTeamDefeat(fightId)
                     end
                 end
             end
+
+            -- Fiend classification: the defeated side's Fiends drop a
+            -- Deathstone to every opposing player, and any Fiend on the
+            -- winning side has its HP/MP fully restored.
+            if allDeadSide1 or allDeadSide2 then
+                local defeatedMembers = allDeadSide1 and side1Members or side2Members
+                local winningMembers = allDeadSide1 and side2Members or side1Members
+
+                local defeatedFiendCount = 0
+                for _, member in ipairs(defeatedMembers) do
+                    if IsValid(member) then
+                        local charId = member:GetNWString("AssignedCharacter", "")
+                        local charData = CHARACTERS.List[charId]
+                        if charData and charData.isFiend then
+                            defeatedFiendCount = defeatedFiendCount + 1
+                        end
+                    end
+                end
+
+                if defeatedFiendCount > 0 then
+                    for _, player in ipairs(winningMembers) do
+                        if IsValid(player) and player:IsPlayer() then
+                            AddResourceToPlayer(player, "Deathstone", 1)
+                        end
+                    end
+                end
+
+                for _, member in ipairs(winningMembers) do
+                    if IsValid(member) then
+                        local charId = member:GetNWString("AssignedCharacter", "")
+                        local charData = CHARACTERS.List[charId]
+                        if charData and charData.isFiend then
+                            local maxHP = member:GetNWInt("TBCMAXHP", 100)
+                            local maxMP = member:GetNWInt("TBCMAXMP", 100)
+                            member:SetNWInt("TBCHP", maxHP)
+                            member:SetNWInt("TBCMP", maxMP)
+                        end
+                    end
+                end
+            end
+
             -- Mark the victory message as sent for this fight
             victoryMessageSent[fightId] = true
         end

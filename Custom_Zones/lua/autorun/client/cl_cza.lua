@@ -9,33 +9,30 @@ if CLIENT then
         shadow = true
     })
 
+    -- Shared with SMT Weapons Code's battle/victory music (cl_battle_music.lua) so the
+    -- two systems can hand off to one another. Neither addon requires the other to load.
+    SMT_MusicState = SMT_MusicState or {
+        Playing = nil,
+        ZoneMusic = nil,
+        InFight = false
+    }
+
     local musicEnabledConVar = CreateClientConVar("area_music_enabled", "1",
                                                   true, false,
                                                   "Toggle area music on or off")
-    local selectedBattleMusicConVar = CreateClientConVar(
-                                          "selected_battle_music", "Random",
-                                          true, false,
-                                          "Stores the selected battle music.")
-    local selectedVictoryMusicConVar = CreateClientConVar(
-                                           "selected_victory_music", "Random",
-                                           true, false,
-                                           "Stores the selected victory music.")
     CreateClientConVar("music_volume", "1", true, false,
                        "Adjust the battle music volume between 0 (mute) and 1 (full volume)")
 
     local musicEnabled = musicEnabledConVar:GetBool()
-    local musicPlaying
-    local zoneMusic
-    local inAFight = false
 
     cvars.AddChangeCallback("area_music_enabled",
                             function(convar_name, value_old, value_new)
         if value_new == "1" then
             musicEnabled = true
         elseif value_new == "0" then
-            if IsValid(musicPlaying) then
-                musicPlaying:Stop()
-                musicPlaying = nil
+            if IsValid(SMT_MusicState.Playing) then
+                SMT_MusicState.Playing:Stop()
+                SMT_MusicState.Playing = nil
             end
             musicEnabled = false
         end
@@ -490,30 +487,33 @@ if CLIENT then
 
         if not musicEnabled then return end
 
-        if inAFight then return end
+        if SMT_MusicState.InFight then return end
 
-        if musicPlaying and musicPlaying:GetFileName() == "sound/" .. musicPath or
+        if SMT_MusicState.Playing and
+            SMT_MusicState.Playing:GetFileName() == "sound/" .. musicPath or
             musicPath == "" then return end
 
         local volume = GetConVar("music_volume"):GetFloat()
 
         -- Fade out the currently playing music if something else is playing
-        if musicPlaying then
+        if SMT_MusicState.Playing then
             for i = 1, 10 do
                 timer.Simple(i * 0.1, function()
-                    if IsValid(musicPlaying) then
-                        musicPlaying:SetVolume(volume * (1 - i / 10))
+                    if IsValid(SMT_MusicState.Playing) then
+                        SMT_MusicState.Playing:SetVolume(volume * (1 - i / 10))
                     end
                 end)
             end
             -- TERMINATE the old music after fade-out and play that new jam
             timer.Simple(1, function()
-                if IsValid(musicPlaying) then musicPlaying:Stop() end
+                if IsValid(SMT_MusicState.Playing) then
+                    SMT_MusicState.Playing:Stop()
+                end
                 -- Play the new music with a fade-in effect by increasing the volume gradually
                 sound.PlayFile("sound/" .. musicPath, "noblock",
                                function(station)
                     if IsValid(station) then
-                        musicPlaying = station
+                        SMT_MusicState.Playing = station
                         station:SetVolume(0)
                         station:EnableLooping(true)
                         station:Play()
@@ -526,7 +526,7 @@ if CLIENT then
                             end)
                         end
 
-                        zoneMusic = station:GetFileName()
+                        SMT_MusicState.ZoneMusic = station:GetFileName()
                     end
                 end)
             end)
@@ -534,7 +534,7 @@ if CLIENT then
             -- If no music is currently playing, play the new music NOW
             sound.PlayFile("sound/" .. musicPath, "noblock", function(station)
                 if IsValid(station) then
-                    musicPlaying = station
+                    SMT_MusicState.Playing = station
                     station:SetVolume(0)
                     station:EnableLooping(true)
                     station:Play()
@@ -547,287 +547,16 @@ if CLIENT then
                         end)
                     end
 
-                    zoneMusic = station:GetFileName()
+                    SMT_MusicState.ZoneMusic = station:GetFileName()
                 end
             end)
         end
     end)
 
     hook.Add("PlayerDeath", "ResetOnDeath",
-             function(victim, inflictor, attacker) musicPlaying = "" end)
-
-    -- This is extra added exclusively for turn based combat. 
-
-    local AvailableBattleMusic = {
-        ["Random"] = "Random",
-        ["Maken X - Washington"] = "Music/Maken X - Washington.ogg",
-        ["Maken X - Transylvania"] = "Music/Maken X - Transylvania.ogg",
-        ["P1 - A Lone Prayer"] = "Music/P1 - A Lone Prayer.ogg",
-        ["P1 - Bloody Destiny"] = "Music/P1 - Bloody Destiny.ogg",
-        ["P1 - Normal Battle -P5 Strikers Refined Mix-"] = "Music/P1 - Normal Battle -P5 Strikers Refined Mix-.ogg",
-        ["P2IS - Battle"] = "Music/P2IS - Battle.ogg",
-        ["P3 - Mass Destruction"] = "Music/P3 - Mass Destruction.ogg",
-        ["P3R - It's Going Down Now"] = "Music/P3R - It's Going Down Now.ogg",
-        ["P3R - Mass Destruction -Reload-"] = "Music/P3R - Mass Destruction -Reload-.ogg",
-        ["P4 - Reach Out To The Truth -First Battle-"] = "Music/P4 - Reach Out To The Truth -First Battle-.ogg",
-        ["P4 - Reach Out To The Truth"] = "Music/P4 - Reach Out To The Truth.ogg",
-        ["P4 - Time to Make History -special mix-"] = "Music/P4 - Time to Make History -special mix-.ogg",
-        ["P5 - Last Surprise"] = "Music/P5 - Last Surprise.ogg",
-        ["P5R - Take Over"] = "Music/P5R - Take Over.ogg",
-        ["P5S - Axe to Grind"] = "Music/P5S - Axe to Grind.ogg",
-        ["P5S - You Are Stronger -Instrumental-"] = "Music/P5S - You Are Stronger -Instrumental-.ogg",
-        ["P5S - You Are Stronger"] = "Music/P5S - You Are Stronger.ogg",
-        ["SMT Imagine - Battle B"] = "Music/SMT Imagine - Battle B.ogg",
-        ["SMT Imagine - Battle New"] = "Music/SMT Imagine - Battle New.ogg",
-        ["SMT Imagine - Battle"] = "Music/SMT Imagine - Battle.ogg",
-        ["SMT Strange Journey - Fear of God -25th Anniversary Mix-"] = "Music/SMT Strange Journey - Fear of God -25th Anniversary Mix-.ogg",
-        ["SMT Strange Journey - Fear of God"] = "Music/SMT Strange Journey - Fear of God.ogg",
-        ["SMT1 - Ginza -25th Anniversary Mix-"] = "Music/SMT1 - Ginza -25th Anniversary Mix-.ogg",
-        ["SMT3 - Common Battle -Amala Network-"] = "Music/SMT3 - Common Battle -Amala Network-.ogg",
-        ["SMT3 - Common Battle Medley"] = "Music/SMT3 - Common Battle Medley.ogg",
-        ["SMT3 - Common Battle -The Depths of Amala-"] = "Music/SMT3 - Common Battle -The Depths of Amala-.ogg",
-        ["SMT3 - Common Battle"] = "Music/SMT3 - Common Battle.ogg",
-        ["SMT4 - Battle-a1"] = "Music/SMT4 - Battle-a1.ogg",
-        ["SMT4 - Battle-a2"] = "Music/SMT4 - Battle-a2.ogg",
-        ["SMT4 - Battle-c1"] = "Music/SMT4 - Battle-c1.ogg",
-        ["SMTDx2 - Downloader"] = "Music/SMTDx2 - Downloader.ogg",
-        ["SMTDx2 - Normal Battle"] = "Music/SMTDx2 - Normal Battle.ogg",
-        ["SMTif - Nemesis -Old Enemy-"] = "Music/SMTif - Nemesis -Old Enemy-.ogg",
-        ["Soul Hackers - Common Battle -Hellion Sounds Cover-"] = "Music/Soul Hackers - Common Battle -Hellion Sounds Cover-.ogg",
-        ["Soul Hackers - Event Battle 2 -Arranged-"] = "Music/Soul Hackers - Event Battle 2 -Arranged-.ogg",
-        ["Soul Hackers - Normal Battle -Arranged-"] = "Music/Soul Hackers - Normal Battle -Arranged-.ogg",
-        ["Soul Hackers - Normal Battle -MONACA Arrangement-"] = "Music/Soul Hackers - Normal Battle -MONACA Arrangement-.ogg",
-        ["Soul Hackers 2 - Normal Battle"] = "Music/Soul Hackers 2 - Normal Battle.ogg"
-    }
-
-    local AvailableVictoryMusic = {
-        ["Random"] = "Random",
-        ["P3R - After the Battle"] = "Music/P3R - After the Battle.ogg",
-        ["P4 - Results"] = "Music/P4 - Results.ogg",
-        ["P5 - Victory"] = "Music/P5 - Victory.ogg",
-        ["SH2 - Victory"] = "Music/SH2 - Victory.ogg",
-        ["SMT Imagine - Death -Game Over-"] = "Music/SMT Imagine - Death -Game Over-.ogg",
-        ["SMT3 - Game Over"] = "Music/SMT3 - Game Over.ogg",
-        ["SMT3 - Level Up"] = "Music/SMT3 - Level Up.ogg",
-        ["SMT3 - What I've Done"] = "Music/SMT3 - What I've Done.mp3",
-        ["SMT4 - Battle Over"] = "Music/SMT4 - Battle Over.ogg"
-    }
-
-    -- Create the tool menu with the dropdown for music selection
-    hook.Add("PopulateToolMenu", "BattleMusicMenu", function()
-        spawnmenu.AddToolMenuOption("Options", "Nara Configuration",
-                                    "BattleConfig", "Battle Configuration", "",
-                                    "", function(panel)
-
-            panel:ClearControls()
-            panel:AddControl("Label", {Text = "Configure Battle Settings"})
-
-            local battleMusicDropdown = panel:ComboBox("Select Battle Music",
-                                                       "selected_battle_music")
-
-            for title, path in pairs(AvailableBattleMusic) do
-                battleMusicDropdown:AddChoice(title, path)
-            end
-
-            battleMusicDropdown.OnSelect =
-                function(_, _, value)
-                    RunConsoleCommand("selected_battle_music", value)
-                    if inAFight then PlayBattleMusic() end
-                end
-
-            local victoryMusicDropdown =
-                panel:ComboBox("Select Victory Music", "selected_victory_music")
-
-            for title, path in pairs(AvailableVictoryMusic) do
-                victoryMusicDropdown:AddChoice(title, path)
-            end
-
-            victoryMusicDropdown.OnSelect =
-                function(_, _, value)
-                    RunConsoleCommand("selected_victory_music", value)
-                end
-
-            panel:NumSlider("Music Volume (This also affects Area Music)",
-                            "music_volume", 0, 1, 2)
-
-            cvars.AddChangeCallback("music_volume", function(_, _, newVolume)
-                if IsValid(musicPlaying) then
-                    musicPlaying:SetVolume(tonumber(newVolume))
-                end
-            end)
-        end)
+             function(victim, inflictor, attacker)
+        SMT_MusicState.Playing = ""
     end)
-
-    function PlayBattleMusic()
-        local musicPath = GetConVar("selected_battle_music"):GetString() or
-                              "Random"
-
-        if musicPath == "Random" or musicPath == "" then
-            -- Create a temporary table excluding the "Random" key
-            local validChoices = {}
-            for key, path in pairs(AvailableBattleMusic) do
-                if key ~= "Random" then
-                    table.insert(validChoices, path)
-                end
-            end
-            -- Pick a random music path from the valid choices
-            musicPath = validChoices[math.random(1, #validChoices)]
-        elseif musicPath then
-            musicPath = AvailableBattleMusic[musicPath]
-        end
-
-        if zoneMusic == ("sound/" .. musicPath) then
-            inAFight = true
-            return
-        end
-        local volume = GetConVar("music_volume"):GetFloat()
-        inAFight = true
-
-        if IsValid(musicPlaying) then musicPlaying:Stop() end
-        if musicPath and musicPath ~= "" then
-            sound.PlayFile("sound/" .. musicPath, "noblock", function(station)
-                if IsValid(station) then
-                    musicPlaying = station
-                    station:SetVolume(volume)
-                    station:EnableLooping(true)
-                    station:Play()
-                end
-            end)
-        end
-    end
-
-    function PlayVictoryMusic()
-        local battlePath = GetConVar("selected_battle_music"):GetString() or
-                               "Random"
-
-        if battlePath and battlePath ~= "Random" or battlePath ~= "" then
-            battlePath = AvailableBattleMusic[battlePath]
-        end
-
-        if zoneMusic == ("sound/" .. battlePath) then
-            inAFight = false
-            return
-        end
-
-        if not musicEnabled then
-            inAFight = false
-            return
-        end
-
-        local musicPath = GetConVar("selected_victory_music"):GetString() or
-                              "Random"
-
-        if musicPath == "Random" or musicPath == "" then
-            -- Create a temporary table excluding the "Random" key
-            local validChoices = {}
-            for key, path in pairs(AvailableVictoryMusic) do
-                if key ~= "Random" then
-                    table.insert(validChoices, path)
-                end
-            end
-            -- Pick a random music path from the valid choices
-            musicPath = validChoices[math.random(1, #validChoices)]
-        elseif musicPath then
-            musicPath = AvailableVictoryMusic[musicPath]
-        end
-
-        local volume = GetConVar("music_volume"):GetFloat()
-
-        if IsValid(musicPlaying) then musicPlaying:Stop() end
-        if musicPath and musicPath ~= "" then
-            sound.PlayFile("sound/" .. musicPath, "noblock", function(station)
-                if IsValid(station) then
-                    musicPlaying = station
-                    station:SetVolume(volume)
-                    -- station:EnableLooping(true)
-                    station:Play()
-
-                    timer.Create("MusicEndTrigger", 15, 1, function()
-                        inAFight = false
-
-                        if not zoneMusic then return end
-
-                        if musicPlaying and musicPlaying:GetFileName() ==
-                            "sound/" .. zoneMusic or zoneMusic == "" then
-                            return
-                        end
-                        for i = 1, 10 do
-                            timer.Simple(i * 0.1, function()
-                                if IsValid(musicPlaying) then
-                                    musicPlaying:SetVolume(volume * (1 - i / 10))
-                                end
-                            end)
-                        end
-                        -- TERMINATE the old music after fade-out and play that new jam
-                        timer.Simple(1, function()
-                            if IsValid(musicPlaying) then
-                                musicPlaying:Stop()
-                            end
-                            -- Play the new music with a fade-in effect by increasing the volume gradually
-                            sound.PlayFile(zoneMusic, "noblock",
-                                           function(station2)
-                                if IsValid(station2) then
-                                    musicPlaying = station2
-                                    station2:SetVolume(0)
-                                    station2:EnableLooping(true)
-                                    station2:Play()
-                                    -- Fade-in but I lie as it just increases the volume.
-                                    for i = 1, 10 do
-                                        timer.Simple(i * 0.1, function()
-                                            if IsValid(station2) then
-                                                station2:SetVolume(
-                                                    volume * (i / 10))
-                                            end
-                                        end)
-                                    end
-
-                                    zoneMusic = station2:GetFileName()
-                                end
-                            end)
-                        end)
-                    end)
-
-                end
-            end)
-        end
-    end
-
-    function EndFightMusic()
-        local battlePath = GetConVar("selected_battle_music"):GetString() or
-                               "Random"
-        if battlePath and battlePath ~= "Random" or battlePath ~= "" then
-            battlePath = AvailableBattleMusic[battlePath]
-        end
-
-        if zoneMusic == ("sound/" .. battlePath) then
-            inAFight = false
-            return
-        end
-
-        if not musicEnabled then
-            inAFight = false
-            return
-        end
-
-        local musicPath = zoneMusic
-        local volume = GetConVar("music_volume"):GetFloat()
-        inAFight = false
-
-        if IsValid(musicPlaying) then musicPlaying:Stop() end
-        if musicPath and musicPath ~= "" then
-            sound.PlayFile(musicPath, "noblock", function(station)
-                if IsValid(station) then
-                    musicPlaying = station
-                    station:SetVolume(volume)
-                    station:EnableLooping(true)
-                    station:Play()
-
-                    zoneMusic = station:GetFileName()
-
-                end
-            end)
-        end
-    end
 
     concommand.Add("getMeter", function(ply)
         -- Get the player's position

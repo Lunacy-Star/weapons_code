@@ -130,7 +130,10 @@ function SWEP:PrimaryAttack()
 
         self:AnnounceAbility()
 
-        local tech = 0
+        local hasVolatileCore = userBuffsTable["Volatile_Core"] ~= nil
+        local baseDamageAmount = hasVolatileCore and 65 or self.DamageAmount
+
+        local tech = hasVolatileCore and 10 or 0
 
         local targetedTargets = RollAoETargets(ply, target, self, tech)
 
@@ -156,7 +159,7 @@ function SWEP:PrimaryAttack()
                 local targetDebuffsTable = GetAllStats(target, "debuffs")
 
                 local targetEffects = {}
-                targetEffects["baseDamage"] = self.DamageAmount
+                targetEffects["baseDamage"] = baseDamageAmount
                 targetEffects["Affinity"] = self.Affinity
 
                 local playerLuck = ply:GetNWInt("TBCLuck", 10)

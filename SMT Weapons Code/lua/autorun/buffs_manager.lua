@@ -107,6 +107,37 @@ if SERVER then
     -- Hook into PlayerInitialSpawn
     hook.Add("PlayerInitialSpawn", "SyncPlayerStatsOnInitialSpawn",
              function(player) SendPlayerStatsToPlayer(player) end)
+
+    -- Applies the one-time Max HP/MP increase for stat-boost passives (Life
+    -- Bonus, Mana Bonus, ...). Data-driven off maxHPBonus/maxMPBonus on the
+    -- buff's own properties table so it works identically whether the buff
+    -- arrived via essence pickup (smti_lifebonus/smti_manabonus :Use()) or
+    -- as a character-innate permaBuff (ApplyCharacterToPlayer / smt_demon).
+    function ApplyStatBoostBuff(target, properties)
+        if not IsValid(target) or not properties then return end
+
+        if properties.maxHPBonus then
+            local currentHP = target:GetNWInt("TBCHP", 100)
+            local maxHP = target:GetNWInt("TBCMAXHP", 100)
+
+            if currentHP >= maxHP then
+                target:SetNWInt("TBCHP", maxHP + properties.maxHPBonus)
+            end
+
+            target:SetNWInt("TBCMAXHP", maxHP + properties.maxHPBonus)
+        end
+
+        if properties.maxMPBonus then
+            local currentMP = target:GetNWInt("TBCMP", 100)
+            local maxMP = target:GetNWInt("TBCMAXMP", 100)
+
+            if currentMP >= maxMP then
+                target:SetNWInt("TBCMP", maxMP + properties.maxMPBonus)
+            end
+
+            target:SetNWInt("TBCMAXMP", maxMP + properties.maxMPBonus)
+        end
+    end
 end
 
 if CLIENT then

@@ -45,6 +45,7 @@ function ENT:Use(activator, caller)
 
     targetBuffsTable["Tansu_of_Vengeance"] = {
         stacks = 1,
+        type = "turnMisc",
         SlotsTaking = 1,
         SlotType = "Equipment",
         ClassName = "smti_tansuofvengeance"

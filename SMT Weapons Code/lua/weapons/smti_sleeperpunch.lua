@@ -254,8 +254,9 @@ function SWEP:PrimaryAttack()
 
                 targetDebuffsTable["Sleep"] = {
                     stacks = 1,
+                    type = "sleep",
                     wearOff = "turnWearOff",
-                    duration = 4
+                    duration = 3
                 }
 
                 AssignStat(targetEffects["target"], "Sleep",

@@ -405,11 +405,15 @@ net.Receive(
                         end
                     end
                 end
+
+                TBC_RemovePersonaPassives(player, oldPersonaData)
             end
 
             for weaponIndex, weaponClass in pairs(personaData.skills) do
                 player:Give(weaponClass)
             end
+
+            TBC_ApplyPersonaPassives(player, personaData)
 
             local playerSWEP = player:GetWeapon("smti_engageswep")
 
@@ -452,6 +456,9 @@ net.Receive(
                     end
                 end
             end
+
+            TBC_RemovePersonaPassives(player, personaData)
+
             if player:GetNW2String("selectedPersona", "") == persona then
                 player:SetNW2String("selectedPersona", "")
             end
@@ -484,7 +491,29 @@ net.Receive(
 local meta = FindMetaTable("Player")
 local OriginalGive = meta.Give
 
+-- Passive pickups (Regenerate, Invigorate, Ice/Fire/Force Boost, Endure,
+-- Tansu of Vengeance, etc.) are registered as scripted_ents, not SWEPs, so
+-- native Give() silently no-ops on their classname (weapons.GetStored finds
+-- nothing). Essence/loadout granting calls ply:Give(itemClass) uniformly
+-- regardless of whether the class is a weapon or one of these passives, so
+-- detect that case here and route it through the entity's own :Use() logic
+-- instead -- that keeps the buff structure (including any type field like
+-- "turnRegen"/"deathState"/"turnMisc") defined in exactly one place per
+-- passive rather than duplicated here.
 function meta:Give(weaponClass, noAmmo)
+    if not weapons.GetStored(weaponClass) then
+        local entTable = scripted_ents.GetStored(weaponClass)
+        if entTable and entTable.t and entTable.t.BuffRegistration then
+            local ent = ents.Create(weaponClass)
+            if IsValid(ent) then
+                ent:SetPos(self:GetPos())
+                ent:Spawn()
+                ent:Use(self, self)
+            end
+            return nil
+        end
+    end
+
     self.TBC_AllowPickup = true
     local wep = OriginalGive(self, weaponClass, noAmmo)
     self.TBC_AllowPickup = false

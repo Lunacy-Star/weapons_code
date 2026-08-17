@@ -46,6 +46,7 @@ function ENT:Use(activator, caller)
 
     targetBuffsTable["Regenerate"] = {
         stacks = 1,
+        type = "turnRegen",
         SlotsTaking = 1,
         SlotType = "Equipment",
         ClassName = "smti_regenerate"

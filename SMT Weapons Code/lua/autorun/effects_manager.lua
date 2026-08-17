@@ -104,6 +104,30 @@ function RollAoETargets(ply, target, weapon, tech)
     return playersInFight
 end
 
+-- Applies/removes the permabuffs listed in a Personas[...] entry's `passives`
+-- table (e.g. Hua Po's Fire Boost). Mirrors how CHARACTERS.List[...].permaBuffs
+-- is applied on character selection, but scoped to persona equip/unequip so
+-- the passive only sticks around while that persona is the selected one.
+function TBC_ApplyPersonaPassives(ply, personaData)
+    if not IsValid(ply) or not personaData or not personaData.passives then
+        return
+    end
+
+    for status, properties in pairs(personaData.passives) do
+        AssignStat(ply, status, properties, "permabuffs")
+    end
+end
+
+function TBC_RemovePersonaPassives(ply, personaData)
+    if not IsValid(ply) or not personaData or not personaData.passives then
+        return
+    end
+
+    for status, _ in pairs(personaData.passives) do
+        RemoveStat(ply, status, "permabuffs")
+    end
+end
+
 function PlayerCheckFight(ply)
     local engageWeapon = ply:GetWeapon("smti_engageswep")
 
@@ -608,6 +632,12 @@ function HandleDeath(ply, target, effectsTable)
 
         if SMTDamageNumbers then
             SMTDamageNumbers.Show(target, nil, "dead")
+        end
+
+        for status, properties in pairs(effectsTable["targetBuffsTable"]) do
+            if properties.type == "onDeath" then
+                HandleStatus(target, status, "onDeath", ply, effectsTable)
+            end
         end
 
         RemoveAllStats(target, "buffs")

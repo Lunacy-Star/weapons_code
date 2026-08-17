@@ -66,17 +66,56 @@ if SERVER then
         net.Broadcast()
     end
 
+    -- Fiend classification: while a player is actively fighting a Fiend
+    -- (on either side of the engagement), the opposing team's kilodevil
+    -- cost is halved so they can field a larger team. Checked via the
+    -- engage swep's FightId, same as everywhere else that needs "am I
+    -- currently in a fight".
+    local function IsPlayerFacingFiend(ply)
+        if not IsValid(ply) then return false end
+
+        local engageSWEP = ply:GetWeapon("smti_engageswep")
+        if not IsValid(engageSWEP) or not engageSWEP.FightId then return false end
+
+        local fight = TBCWeaponMetatable.OngoingFights[engageSWEP.FightId]
+        if not fight then return false end
+
+        local opposingSide
+        if table.HasValue(fight.Side1, ply) then
+            opposingSide = fight.Side2
+        elseif table.HasValue(fight.Side2, ply) then
+            opposingSide = fight.Side1
+        end
+
+        if not opposingSide then return false end
+
+        for _, member in ipairs(opposingSide) do
+            if IsValid(member) then
+                local charId = member:GetNWString("AssignedCharacter", "")
+                local charData = CHARACTERS and CHARACTERS.List and CHARACTERS.List[charId]
+                if charData and charData.isFiend then return true end
+            end
+        end
+
+        return false
+    end
+
     -- A player's kilodevil cost is their assigned character's `kilodevil` field,
     -- defaulting to 100 (the standard human cost) if unset or unassigned.
     function GetPlayerKilodevil(ply)
         if not IsValid(ply) then return 100 end
 
+        local baseCost = 100
         local charID = ply:GetNWString("AssignedCharacter", "")
         if charID ~= "" and CHARACTERS and CHARACTERS.List and CHARACTERS.List[charID] then
-            return CHARACTERS.List[charID].kilodevil or 100
+            baseCost = CHARACTERS.List[charID].kilodevil or 100
         end
 
-        return 100
+        if IsPlayerFacingFiend(ply) then
+            return math.ceil(baseCost / 2)
+        end
+
+        return baseCost
     end
 
     -- Recomputes and stores a party's total kilodevil from its current members'
