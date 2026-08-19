@@ -59,39 +59,47 @@ SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
 SWEP.CheckForTeamDefeat = TBCWeaponMetatable.CheckForTeamDefeat
 SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 
-function SWEP:Initialize() self.CanUseAbility = true end
+function SWEP:Initialize()
+    self.CanUseAbility = true
+end
 
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 0.4)
+    self:SetNextPrimaryFire(CurTime() + 1)
 
     local ply = self:GetOwner()
 
     ply:LagCompensation(true)
 
     local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 120
+    local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
     local tmin = Vector(1, 1, 1) * -10
     local tmax = Vector(1, 1, 1) * 10
 
-    local tr = util.TraceHull({
-        start = ShootPos,
-        endpos = ShootEnd,
-        filter = ply,
-        mask = MASK_SHOT_HULL,
-        mins = tmin,
-        maxs = tmax
-    })
-
-    if not IsValid(tr.Entity) then
-        tr = util.TraceLine({
+    local tr =
+        util.TraceHull(
+        {
             start = ShootPos,
             endpos = ShootEnd,
             filter = ply,
-            mask = MASK_SHOT_HULL
-        })
+            mask = MASK_SHOT_HULL,
+            mins = tmin,
+            maxs = tmax
+        }
+    )
+
+    if not IsValid(tr.Entity) then
+        tr =
+            util.TraceLine(
+            {
+                start = ShootPos,
+                endpos = ShootEnd,
+                filter = ply,
+                mask = MASK_SHOT_HULL
+            }
+        )
     end
 
     self:ShootEffects()
@@ -108,12 +116,10 @@ function SWEP:PrimaryAttack()
         dmg:SetDamageForce(ply:GetAimVector())
         dmg:SetDamagePosition(target:GetPos())
         dmg:SetDamageType(DMG_CLUB)
-        target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                                   ShootEnd)
+        target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5, ShootEnd)
 
         if SERVER and IsValid(target) then
-            if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or
-                not TargetCheckValidity(ply, target, true) then
+            if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or not TargetCheckValidity(ply, target, true) then
                 ply:LagCompensation(false)
                 return
             end
@@ -130,8 +136,7 @@ function SWEP:PrimaryAttack()
             targetEffects["userBuffsTable"] = userBuffsTable
             targetEffects["userDebuffsTable"] = userDebuffsTable
 
-            local status = HandleStatus(ply, targetEffects["userDebuffsTable"],
-                                        "canUseSkills", true, targetEffects)
+            local status = HandleStatus(ply, targetEffects["userDebuffsTable"], "canUseSkills", true, targetEffects)
 
             if not status then
                 ply:LagCompensation(false)
@@ -141,13 +146,14 @@ function SWEP:PrimaryAttack()
             local playerStr = tonumber(ply:GetNWInt("TBCSTR", 0))
             local mpCost = self.MPCost -- MP cost of the attack
             local attackerMP = ply:GetNWInt("TBCMP", 100)
-            if playerStr >= 4 then mpCost = 20 end
+            if playerStr >= 4 then
+                mpCost = 20
+            end
 
-            mpCost = mpCost +
-                         (HandleStatus(ply, userDebuffsTable, "increaseMPCost",
-                                       mpCost) -
-                             HandleStatus(ply, userBuffsTable, "decreaseMPCost",
-                                          mpCost))
+            mpCost =
+                mpCost +
+                (HandleStatus(ply, userDebuffsTable, "increaseMPCost", mpCost) -
+                    HandleStatus(ply, userBuffsTable, "decreaseMPCost", mpCost))
 
             if attackerMP >= mpCost then
                 ply:SetNWInt("TBCMP", attackerMP - mpCost)
@@ -167,29 +173,23 @@ function SWEP:PrimaryAttack()
 
             local playerLuck = ply:GetNWInt("TBCLuck", 10)
 
-            playerLuck = playerLuck +
-                             (HandleStatus(ply, userBuffsTable, "increaseLuck",
-                                           playerLuck) -
-                                 HandleStatus(ply, userDebuffsTable,
-                                              "decreaseLuck", playerLuck))
+            playerLuck =
+                playerLuck +
+                (HandleStatus(ply, userBuffsTable, "increaseLuck", playerLuck) -
+                    HandleStatus(ply, userDebuffsTable, "decreaseLuck", playerLuck))
 
             local playerChr = tonumber(ply:GetNWInt("TBCCHR", 0))
             targetEffects["ailmentChance"] = 10
             if playerChr >= 4 then
                 targetEffects["ailmentChance"] = 20
             end
-            targetEffects["ailmentChance"] =
-                math.ceil(playerLuck / 2) + targetEffects["ailmentChance"]
+            targetEffects["ailmentChance"] = math.ceil(playerLuck / 2) + targetEffects["ailmentChance"]
 
-            local critBonus = (HandleStatus(ply, userBuffsTable,
-                                            "increaseCritChance",
-                                            targetEffects["baseDamage"]) -
-                                  HandleStatus(ply, userDebuffsTable,
-                                               "decreaseCritChance",
-                                               targetEffects["baseDamage"]))
+            local critBonus =
+                (HandleStatus(ply, userBuffsTable, "increaseCritChance", targetEffects["baseDamage"]) -
+                HandleStatus(ply, userDebuffsTable, "decreaseCritChance", targetEffects["baseDamage"]))
 
-            targetEffects["critChance"] =
-                math.ceil((playerLuck / 2) + critBonus)
+            targetEffects["critChance"] = math.ceil((playerLuck / 2) + critBonus)
 
             targetEffects["ply"] = ply
             targetEffects["target"] = target
@@ -199,44 +199,49 @@ function SWEP:PrimaryAttack()
             targetEffects["targetBuffsTable"] = targetBuffsTable
             targetEffects["targetDebuffsTable"] = targetDebuffsTable
 
-            targetEffects["state"] = 'normal'
+            targetEffects["state"] = "normal"
 
-            targetEffects = HandleRepel(targetEffects["ply"],
-                                        targetEffects["target"], targetEffects)
-            if targetEffects["state"] == 'repel' then
+            targetEffects = HandleRepel(targetEffects["ply"], targetEffects["target"], targetEffects)
+            if targetEffects["state"] == "repel" then
                 self:AnnounceMessage(target:Name() .. " repeled the attack!")
             end
 
-            targetEffects = HandleResistances(targetEffects["ply"],
-                                              targetEffects["target"],
-                                              targetEffects)
-            targetEffects = HandleWeaknesses(targetEffects["ply"],
-                                             targetEffects["target"],
-                                             targetEffects)
-            targetEffects = HandleCrit(targetEffects["ply"],
-                                       targetEffects["target"], targetEffects)
-            targetEffects = HandleBlock(targetEffects["ply"],
-                                        targetEffects["target"], targetEffects)
-            targetEffects = HandleDrain(targetEffects["ply"],
-                                        targetEffects["target"], targetEffects)
+            targetEffects = HandleResistances(targetEffects["ply"], targetEffects["target"], targetEffects)
+            targetEffects = HandleWeaknesses(targetEffects["ply"], targetEffects["target"], targetEffects)
+            targetEffects = HandleCrit(targetEffects["ply"], targetEffects["target"], targetEffects)
+            targetEffects = HandleBlock(targetEffects["ply"], targetEffects["target"], targetEffects)
+            targetEffects = HandleDrain(targetEffects["ply"], targetEffects["target"], targetEffects)
 
             targetEffects["baseDamage"] =
                 targetEffects["baseDamage"] +
-                    (HandleStatus(targetEffects["ply"],
-                                  targetEffects["userBuffsTable"], "damage",
-                                  targetEffects["baseDamage"], targetEffects) -
-                        HandleStatus(targetEffects["ply"],
-                                     targetEffects["userDebuffsTable"],
-                                     "decreaseDamage",
-                                     targetEffects["baseDamage"], targetEffects)) -
-                    (HandleStatus(targetEffects["target"],
-                                  targetEffects["targetBuffsTable"],
-                                  "defenseDamage", targetEffects["baseDamage"],
-                                  targetEffects) -
-                        HandleStatus(targetEffects["target"],
-                                     targetEffects["targetDebuffsTable"],
-                                     "defenseDecrease",
-                                     targetEffects["baseDamage"], targetEffects))
+                (HandleStatus(
+                    targetEffects["ply"],
+                    targetEffects["userBuffsTable"],
+                    "damage",
+                    targetEffects["baseDamage"],
+                    targetEffects
+                ) -
+                    HandleStatus(
+                        targetEffects["ply"],
+                        targetEffects["userDebuffsTable"],
+                        "decreaseDamage",
+                        targetEffects["baseDamage"],
+                        targetEffects
+                    )) -
+                (HandleStatus(
+                    targetEffects["target"],
+                    targetEffects["targetBuffsTable"],
+                    "defenseDamage",
+                    targetEffects["baseDamage"],
+                    targetEffects
+                ) -
+                    HandleStatus(
+                        targetEffects["target"],
+                        targetEffects["targetDebuffsTable"],
+                        "defenseDecrease",
+                        targetEffects["baseDamage"],
+                        targetEffects
+                    ))
 
             targetEffects["baseDamage"] = math.ceil(targetEffects["baseDamage"])
 
@@ -244,26 +249,37 @@ function SWEP:PrimaryAttack()
 
             targetEffects["ailmentChance"] =
                 targetEffects["ailmentChance"] +
-                    (HandleStatus(targetEffects["ply"], userBuffsTable,
-                                  "increaseAilmentChance",
-                                  targetEffects["ailmentChance"], targetEffects) -
-                        HandleStatus(targetEffects["ply"], userDebuffsTable,
-                                     "decreaseAilmentChance",
-                                     targetEffects["ailmentChance"],
-                                     targetEffects)) -
-                    (HandleStatus(targetEffects["target"], targetBuffsTable,
-                                  "decreaseAilmentReceive",
-                                  targetEffects["ailmentChance"], targetEffects) -
-                        HandleStatus(targetEffects["target"],
-                                     targetDebuffsTable,
-                                     "increaseAilmentReceive",
-                                     targetEffects["ailmentChance"],
-                                     targetEffects))
+                (HandleStatus(
+                    targetEffects["ply"],
+                    userBuffsTable,
+                    "increaseAilmentChance",
+                    targetEffects["ailmentChance"],
+                    targetEffects
+                ) -
+                    HandleStatus(
+                        targetEffects["ply"],
+                        userDebuffsTable,
+                        "decreaseAilmentChance",
+                        targetEffects["ailmentChance"],
+                        targetEffects
+                    )) -
+                (HandleStatus(
+                    targetEffects["target"],
+                    targetBuffsTable,
+                    "decreaseAilmentReceive",
+                    targetEffects["ailmentChance"],
+                    targetEffects
+                ) -
+                    HandleStatus(
+                        targetEffects["target"],
+                        targetDebuffsTable,
+                        "increaseAilmentReceive",
+                        targetEffects["ailmentChance"],
+                        targetEffects
+                    ))
 
             if math.random(1, 100) <= targetEffects["ailmentChance"] then
-
-                local targetDebuffsTable =
-                    GetAllStats(targetEffects["target"], "debuffs")
+                local targetDebuffsTable = GetAllStats(targetEffects["target"], "debuffs")
 
                 targetDebuffsTable["Burn"] = {
                     stacks = 1,
@@ -272,18 +288,13 @@ function SWEP:PrimaryAttack()
                     duration = 3
                 }
 
-                AssignStat(targetEffects["target"], "Burn",
-                           targetDebuffsTable["Burn"], "debuffs")
+                AssignStat(targetEffects["target"], "Burn", targetDebuffsTable["Burn"], "debuffs")
 
-                self:AnnounceMessage(targetEffects["target"]:Name() ..
-                                         " is now Burning!")
-                HandleStatus(targetEffects["ply"], userBuffsTable,
-                             "ailmentReaction", "Burn", targetEffects)
+                self:AnnounceMessage(targetEffects["target"]:Name() .. " is now Burning!")
+                HandleStatus(targetEffects["ply"], userBuffsTable, "ailmentReaction", "Burn", targetEffects)
             end
 
-            targetEffects = HandleDamageMessage(targetEffects["ply"],
-                                                targetEffects["target"],
-                                                targetEffects)
+            targetEffects = HandleDamageMessage(targetEffects["ply"], targetEffects["target"], targetEffects)
 
             local currentHP = targetEffects["target"]:GetNWInt("TBCHP", 100)
             local maxHP = targetEffects["target"]:GetNWInt("TBCMAXHP", 100)
@@ -293,29 +304,22 @@ function SWEP:PrimaryAttack()
                 newHP = math.min(currentHP + targetEffects["baseDamage"], maxHP)
             else
                 newHP = currentHP - targetEffects["baseDamage"]
-                HandleStatus(targetEffects["target"], targetEffects,
-                             "damageReaction", false, targetEffects)
+                HandleStatus(targetEffects["target"], targetEffects, "damageReaction", false, targetEffects)
             end
 
             targetEffects["target"]:SetNWInt("TBCHP", newHP)
 
             self:AnnounceMessage(targetEffects["message"])
-          
+
             if newHP <= 0 then
                 targetEffects["target"]:SetNWInt("TBCHP", 0)
 
                 targetEffects["lifeState"] = "dead"
-                targetEffects = HandleDeath(targetEffects["ply"],
-                                            targetEffects["target"],
-                                            targetEffects)
-                targetEffects = HandleKill(targetEffects["ply"],
-                                           targetEffects["target"],
-                                           targetEffects)
+                targetEffects = HandleDeath(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleKill(targetEffects["ply"], targetEffects["target"], targetEffects)
 
                 self:CheckForTeamDefeat(self.FightId)
             end
-
-            
         end
     end
 

@@ -14,6 +14,48 @@ function CheckIfValidTBCEntity(entity)
     return false
 end
 
+-- On Stage: if any member of the striker's side carries this passive, a
+-- critical strike or weakness strike by ANY of that side's members heals and
+-- restores SP to whoever landed the hit.
+function TBC_CheckOnStage(ply)
+    if not IsValid(ply) then return end
+
+    local engageWeapon = ply:GetWeapon("smti_engageswep")
+    if not IsValid(engageWeapon) or not engageWeapon.FightId then return end
+
+    local fight = TBCWeaponMetatable.OngoingFights[engageWeapon.FightId]
+    if not fight then return end
+
+    local playerSide
+    if table.HasValue(fight.Side1, ply) then
+        playerSide = fight.Side1
+    elseif table.HasValue(fight.Side2, ply) then
+        playerSide = fight.Side2
+    end
+    if not playerSide then return end
+
+    local hasOnStage = false
+    for _, member in ipairs(playerSide) do
+        if IsValid(member) then
+            local permaBuffs = GetAllStats(member, "permabuffs")
+            if permaBuffs and permaBuffs["On_Stage"] then
+                hasOnStage = true
+                break
+            end
+        end
+    end
+
+    if not hasOnStage then return end
+
+    local currentHP = ply:GetNWInt("TBCHP", 100)
+    local maxHP = ply:GetNWInt("TBCMAXHP", 100)
+    ply:SetNWInt("TBCHP", math.min(currentHP + 20, maxHP))
+
+    local currentMP = ply:GetNWInt("TBCMP", 100)
+    local maxMP = ply:GetNWInt("TBCMAXMP", 100)
+    ply:SetNWInt("TBCMP", math.min(currentMP + 10, maxMP))
+end
+
 function PlayerCheckEngageSWEP(ply)
     local engageWeapon = ply:GetWeapon("smti_engageswep")
     if not IsValid(engageWeapon) then
@@ -115,6 +157,7 @@ function TBC_ApplyPersonaPassives(ply, personaData)
 
     for status, properties in pairs(personaData.passives) do
         AssignStat(ply, status, properties, "permabuffs")
+        ApplyStatBoostBuff(ply, properties)
     end
 end
 
@@ -123,7 +166,8 @@ function TBC_RemovePersonaPassives(ply, personaData)
         return
     end
 
-    for status, _ in pairs(personaData.passives) do
+    for status, properties in pairs(personaData.passives) do
+        RemoveStatBoostBuff(ply, properties)
         RemoveStat(ply, status, "permabuffs")
     end
 end
@@ -215,6 +259,13 @@ function TargetCheckValidity(ply, target, hpValidation)
             ply:ChatPrint(message)
             return false
         end
+    end
+
+    local currentHP = ply:GetNWInt("TBCHP", 100)
+    if currentHP <= 0 then
+        local message = "You can't do this while you're dead."
+        ply:ChatPrint(message)
+        return false
     end
 
     if SMTParticles then
@@ -432,10 +483,19 @@ end
 function HandleWeaknesses(ply, target, effectsTable)
     local weak = util.JSONToTable(target:GetNW2String("weak"))
 
+    -- "<Element> Break" skills (e.g. Fire Break) temporarily force a Weak
+    -- reaction to that element without touching the character's real weak
+    -- list -- tracked as a plain debuff so it naturally expires/dispels
+    -- (via the matching "<Element> Wall" skill) like any other debuff.
+    local hasBreak = effectsTable["targetDebuffsTable"] and
+                          effectsTable["targetDebuffsTable"][effectsTable["Affinity"] ..
+                              "_Break"] ~= nil
+
     if
         table.HasValue(weak, effectsTable["Affinity"]) or
             (table.HasValue(weak, "Magic") and table.HasValue(Affinities["Magic"], effectsTable["Affinity"])) or
-            (table.HasValue(weak, "Physical") and table.HasValue(Affinities.Physical, effectsTable["Affinity"]))
+            (table.HasValue(weak, "Physical") and table.HasValue(Affinities.Physical, effectsTable["Affinity"])) or
+            hasBreak
      then
         local weakModifier = 1.1
 
@@ -461,6 +521,8 @@ function HandleWeaknesses(ply, target, effectsTable)
             effectsTable["ailmentChance"] = effectsTable["ailmentChance"] + 5
         end
         effectsTable["state"] = "weak"
+
+        TBC_CheckOnStage(ply)
     end
 
     return effectsTable
@@ -516,6 +578,8 @@ function HandleCrit(ply, target, effectsTable)
     if math.random(0, 100) <= effectsTable["critChance"] then
         effectsTable["baseDamage"] = math.ceil(effectsTable["baseDamage"] * 1.1) -- Increase damage by 10%
         effectsTable["state"] = "crit"
+
+        TBC_CheckOnStage(ply)
     end
 
     return effectsTable

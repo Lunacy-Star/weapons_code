@@ -92,14 +92,14 @@ local function ApplySoleAngelBonus(ply, playersInFight, weapon)
 end
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 0.4)
+    self:SetNextPrimaryFire(CurTime() + 1)
 
     local ply = self:GetOwner()
 
     ply:LagCompensation(true)
 
     local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 120
+    local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
     local tmin = Vector(1, 1, 1) * -10
     local tmax = Vector(1, 1, 1) * 10
@@ -454,14 +454,14 @@ function SWEP:PrimaryAttack()
 end --
 
 function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 0.4)
+    self:SetNextSecondaryFire(CurTime() + 1)
 
     local ply = self:GetOwner()
 
     ply:LagCompensation(true)
 
     local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 120
+    local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
     local tmin = Vector(1, 1, 1) * -10
     local tmax = Vector(1, 1, 1) * 10

@@ -50,7 +50,7 @@ end
 
 function SWEP:PrimaryAttack()
 
-    self:SetNextPrimaryFire(CurTime() + 0.4) -- Adjust cooldown as necessary
+    self:SetNextPrimaryFire(CurTime() + 1) -- Adjust cooldown as necessary
 
     if CLIENT then return end
 
@@ -70,7 +70,7 @@ function SWEP:PrimaryAttack()
     ply:LagCompensation(true)
 
     local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 65 -- Adjust range as necessary
+    local ShootEnd = ShootPos + ply:GetAimVector() * 250 -- Adjust range as necessary
 
     local tmin = Vector(1, 1, 1) * -10
     local tmax = Vector(1, 1, 1) * 10
@@ -166,7 +166,7 @@ function SWEP:SecondaryAttack()
     end
 
     local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 65
+    local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
     local tr = util.TraceLine({
         start = ShootPos,
@@ -181,6 +181,13 @@ function SWEP:SecondaryAttack()
         if targetEngageSWEP and targetEngageSWEP.InCombat then
             local fight =
                 TBCWeaponMetatable.OngoingFights[targetEngageSWEP.FightId]
+
+            if fight and fight.Started then
+                ply:ChatPrint("This fight has already started, you can't join.")
+                ply:LagCompensation(false)
+                return
+            end
+
             local sideToJoin =
                 (table.HasValue(fight.Side1, target) and "Side1") or
                     (table.HasValue(fight.Side2, target) and "Side2")

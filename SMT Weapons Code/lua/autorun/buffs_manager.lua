@@ -138,6 +138,34 @@ if SERVER then
             target:SetNWInt("TBCMAXMP", maxMP + properties.maxMPBonus)
         end
     end
+
+    -- Reverses ApplyStatBoostBuff. Used when a persona-granted stat-boost
+    -- passive (e.g. Life Bonus) goes away on persona swap/loss -- unlike
+    -- essence-bought or character-innate stat boosts, which are only ever
+    -- cleared by a full character switch (which resets Max HP/MP to
+    -- baseline before reapplying remaining permaBuffs), a persona passive
+    -- needs its own bonus subtracted out directly.
+    function RemoveStatBoostBuff(target, properties)
+        if not IsValid(target) or not properties then return end
+
+        if properties.maxHPBonus then
+            local currentHP = target:GetNWInt("TBCHP", 100)
+            local maxHP = target:GetNWInt("TBCMAXHP", 100)
+            local newMaxHP = math.max(maxHP - properties.maxHPBonus, 1)
+
+            target:SetNWInt("TBCMAXHP", newMaxHP)
+            target:SetNWInt("TBCHP", math.min(currentHP, newMaxHP))
+        end
+
+        if properties.maxMPBonus then
+            local currentMP = target:GetNWInt("TBCMP", 100)
+            local maxMP = target:GetNWInt("TBCMAXMP", 100)
+            local newMaxMP = math.max(maxMP - properties.maxMPBonus, 0)
+
+            target:SetNWInt("TBCMAXMP", newMaxMP)
+            target:SetNWInt("TBCMP", math.min(currentMP, newMaxMP))
+        end
+    end
 end
 
 if CLIENT then

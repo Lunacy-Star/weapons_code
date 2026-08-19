@@ -543,8 +543,6 @@ if SERVER then
             if charId and charId ~= "" then
                 victim:RemovePData("SavedPersona_" .. charId)
             end
-
-            victim:ChatPrint("You have died and lost your Persona.")
         end
     )
 

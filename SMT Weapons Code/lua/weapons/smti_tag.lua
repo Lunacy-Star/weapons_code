@@ -55,19 +55,19 @@ SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
 SWEP.CheckForTeamDefeat = TBCWeaponMetatable.CheckForTeamDefeat
 SWEP.EndAbility = TBCWeaponMetatable.EndAbility
-SWEP.FreeNextTurn = TBCWeaponMetatable.FreeNextTurn
+SWEP.NextTurn = TBCWeaponMetatable.NextTurn
 
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 0.4)
+    self:SetNextPrimaryFire(CurTime() + 1)
 
     local ply = self:GetOwner()
 
     ply:LagCompensation(true)
 
     local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 120
+    local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
     self:ShootEffects()
     self:EmitSound(ShootSound)
@@ -82,12 +82,10 @@ function SWEP:PrimaryAttack()
     dmg:SetDamageForce(ply:GetAimVector())
     dmg:SetDamagePosition(target:GetPos())
     dmg:SetDamageType(DMG_CLUB)
-    target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                               ShootEnd)
+    target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5, ShootEnd)
 
     if SERVER and IsValid(target) then
-        if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or
-            not TargetCheckValidity(ply, target, true) then
+        if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or not TargetCheckValidity(ply, target, true) then
             ply:LagCompensation(false)
             return
         end
@@ -102,8 +100,7 @@ function SWEP:PrimaryAttack()
         targetEffects["userBuffsTable"] = userBuffsTable
         targetEffects["userDebuffsTable"] = userDebuffsTable
 
-        local status = HandleStatus(ply, targetEffects["userDebuffsTable"],
-                                    "canUseSkills", true, targetEffects)
+        local status = HandleStatus(ply, targetEffects["userDebuffsTable"], "canUseSkills", true, targetEffects)
 
         if not status then
             ply:LagCompensation(false)
@@ -113,11 +110,10 @@ function SWEP:PrimaryAttack()
         local mpCost = self.MPCost -- MP cost of the attack
         local attackerMP = ply:GetNWInt("TBCMP", 100)
 
-        mpCost = mpCost +
-                     (HandleStatus(ply, userDebuffsTable, "increaseMPCost",
-                                   mpCost) -
-                         HandleStatus(ply, userBuffsTable, "decreaseMPCost",
-                                      mpCost))
+        mpCost =
+            mpCost +
+            (HandleStatus(ply, userDebuffsTable, "increaseMPCost", mpCost) -
+                HandleStatus(ply, userBuffsTable, "decreaseMPCost", mpCost))
 
         if attackerMP >= mpCost then
             ply:SetNWInt("TBCMP", attackerMP - mpCost)
@@ -127,10 +123,12 @@ function SWEP:PrimaryAttack()
             return
         end
 
-        self:AnnounceMessage(ply:Name() ..
-                                  " uses Tag to skip their turn for free!")
+        local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
+        fight.TurnCounter = fight.TurnCounter + 1
 
-        self:FreeNextTurn()
+        self:AnnounceMessage(ply:Name() .. " uses Tag to skip their turn for free!")
+
+        self:NextTurn()
     end
 
     ply:LagCompensation(false)

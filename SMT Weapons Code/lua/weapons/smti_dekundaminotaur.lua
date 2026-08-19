@@ -63,7 +63,7 @@ local ShootSound = Sound("Weapon_357.single")
 local KundaDebuffs = {"Tarunda", "Rakunda", "Sukunda", "Heal_Dampener", "Lydia"}
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 0.4)
+    self:SetNextPrimaryFire(CurTime() + 1)
 
     local ply = self:GetOwner()
 

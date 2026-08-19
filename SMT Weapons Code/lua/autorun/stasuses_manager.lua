@@ -37,6 +37,19 @@ local DamageDealerStatusHandlers = {
 
         return math.ceil(damage * 1.1)
     end,
+    Ruin_Boost = function(ply, effectsTable, properties, damage)
+        if ply then
+            local weapon = ply:GetActiveWeapon()
+
+            if IsValid(weapon) then
+                local weaponClass = weapon:GetClass()
+                if weapon.Affinity and weapon.Affinity == "Ruin" then
+                    return math.ceil((damage) + (10))
+                end
+            end
+        end
+        return damage
+    end,
     Fire_Boost = function(ply, effectsTable, properties, damage)
         if ply then
             local weapon = ply:GetActiveWeapon()
@@ -44,6 +57,18 @@ local DamageDealerStatusHandlers = {
             if IsValid(weapon) then
                 local weaponClass = weapon:GetClass()
                 if weapon.Affinity and weapon.Affinity == "Fire" then
+                    return math.ceil((damage) + (10))
+                end
+            end
+        end
+        return damage
+    end,
+    Phys_Boost = function(ply, effectsTable, properties, damage)
+        if ply then
+            local weapon = ply:GetActiveWeapon()
+
+            if IsValid(weapon) then
+                if weapon.Affinity and table.HasValue(Affinities.Physical, weapon.Affinity) then
                     return math.ceil((damage) + (10))
                 end
             end
@@ -639,6 +664,37 @@ local DamageDealerStatusHandlers = {
         end
         return damage
     end,
+    -- Castor's persona-exclusive charge. Stronger than the universal
+    -- Power_Charge (1.6x instead of 1.25x), so it's tracked as its own
+    -- buff rather than reusing the shared "Power_Charge" key.
+    Bloody_Charge = function(ply, effectsTable, properties, damage)
+        if ply then
+            local weapon = ply:GetActiveWeapon()
+
+            if IsValid(weapon) then
+                if not weapon.WeaponType == "Combat Tactic" then
+                    if weapon.Affinity and table.HasValue(Affinities["Physical"], weapon.Affinity) then
+                        timer.Create(
+                            "Bloody_Charge",
+                            1,
+                            1,
+                            function()
+                                local userBuffsTable = GetAllStats(ply, "buffs")
+
+                                if userBuffsTable["Bloody_Charge"] then
+                                    RemoveStat(ply, "Bloody_Charge", "buffs")
+                                    userBuffsTable["Bloody_Charge"] = nil
+                                end
+                            end
+                        )
+
+                        return math.ceil((damage) * (1.6))
+                    end
+                end
+            end
+        end
+        return damage
+    end,
     Power_Charge_Boss = function(ply, effectsTable, properties, damage)
         if ply then
             local weapon = ply:GetActiveWeapon()
@@ -691,6 +747,38 @@ local DamageDealerStatusHandlers = {
                         )
 
                         return math.ceil((damage) * (1.25))
+                    end
+                end
+            end
+        end
+        return damage
+    end,
+    -- Penthesilea's persona-exclusive Mind Charge. Stronger than the
+    -- universal Mind_Charge (1.6x instead of 1.25x), so it's tracked as its
+    -- own buff rather than reusing the shared "Mind_Charge" key.
+    Mind_Charge_Penthesilea = function(ply, effectsTable, properties, damage)
+        if ply then
+            local weapon = ply:GetActiveWeapon()
+
+            if IsValid(weapon) then
+                if not weapon.WeaponType == "Combat Tactic" then
+                    local weaponClass = weapon:GetClass()
+                    if weapon.Affinity and table.HasValue(Affinities["Magic"], weapon.Affinity) then
+                        timer.Create(
+                            "Mind_Charge_Penthesilea",
+                            1,
+                            1,
+                            function()
+                                local userBuffsTable = GetAllStats(ply, "buffs")
+
+                                if userBuffsTable["Mind_Charge_Penthesilea"] then
+                                    RemoveStat(ply, "Mind_Charge_Penthesilea", "buffs")
+                                    userBuffsTable["Mind_Charge_Penthesilea"] = nil
+                                end
+                            end
+                        )
+
+                        return math.ceil((damage) * (1.6))
                     end
                 end
             end
@@ -1095,6 +1183,12 @@ local DamageDefenseStatusHandlers = {
     Rakukaja = function(ply, effectsTable, properties, damage)
         return math.floor((damage) * (1 - 0.1 * properties.stacks))
     end,
+    -- Agathion's persona-exclusive Rakukaja. Stronger than the universal
+    -- Rakukaja (0.2x per stack instead of 0.1x), so it's tracked as its own
+    -- buff rather than reusing the shared "Rakukaja" key.
+    Rakukaja_Agathion = function(ply, effectsTable, properties, damage)
+        return math.floor((damage) * (1 - 0.2 * properties.stacks))
+    end,
     Encore = function(ply, effectsTable, properties, damage)
         local userBuffsTable = GetAllStats(ply, "buffs")
         if userBuffsTable["Rakukaja"] then
@@ -1185,6 +1279,12 @@ local DamageDefenseStatusHandlers = {
 local DefenseDecreaseStatusHandlers = {
     Rakunda = function(ply, effectsTable, properties, damage)
         return math.ceil((damage) * (1 + 0.1 * properties.stacks))
+    end,
+    -- Polydeuces' persona-exclusive Rakunda. Stronger than the universal
+    -- Rakunda (0.2x per stack instead of 0.1x), so it's tracked as its own
+    -- buff rather than reusing the shared "Rakunda" key.
+    Rakunda_Polydeuces = function(ply, effectsTable, properties, damage)
+        return math.ceil((damage) * (1 + 0.2 * properties.stacks))
     end,
     Sleep = function(ply, effectsTable, properties, damage)
         RemoveStat(ply, "Sleep", "debuffs")
@@ -1504,6 +1604,9 @@ local DecreaseLuckStatusHandlers = {
 -- Escape chance increase or decrease statuses
 
 local IncreaseEscapeStatusHandlers = {
+    Escape_Route = function(ply, chance, properties)
+        return chance + 40
+    end,
     Fast_Retreat = function(ply, chance, properties)
         local totalChance = chance
         if ply then
@@ -1574,6 +1677,20 @@ local IncreaseCritReceiveStatusHandlers = {
                             return crit + (100)
                         end
                     end
+                end
+            end
+        end
+        return crit
+    end,
+    Critical_Eye = function(ply, crit, properties)
+        return crit + 20
+    end,
+    Bloody_Charge = function(ply, crit, properties)
+        if ply then
+            local weapon = ply:GetActiveWeapon()
+            if IsValid(weapon) then
+                if weapon.Affinity and table.HasValue(Affinities["Physical"], weapon.Affinity) then
+                    return crit + (20)
                 end
             end
         end
@@ -2235,6 +2352,23 @@ local ReactionDebuffStatusHandlers = {
 local IncreaseMPCostStatusHandlers = {}
 
 local DecreaseMPCostStatusHandlers = {
+    Zero_Set = function(ply, cost, properties)
+        timer.Create(
+            "Zero_Set_" .. ply:UserID(),
+            1,
+            1,
+            function()
+                if IsValid(ply) then
+                    local userBuffsTable = GetAllStats(ply, "buffs")
+                    if userBuffsTable["Zero_Set"] then
+                        RemoveStat(ply, "Zero_Set", "buffs")
+                        userBuffsTable["Zero_Set"] = nil
+                    end
+                end
+            end
+        )
+        return cost
+    end,
     MP_Optimization = function(ply, cost, properties)
         local weapon = ply:GetActiveWeapon()
         if IsValid(weapon) then
@@ -2341,6 +2475,12 @@ local ReactionDamageStatusHandlers = {
     end,
     Counter = function(ply, effectsTable, properties)
         if ply then
+            if math.random(1, 100) > 15 then return true end
+
+            if not (effectsTable["Affinity"] and table.HasValue(Affinities.Physical, effectsTable["Affinity"])) then
+                return true
+            end
+
             local weapon = ply:GetActiveWeapon()
             if IsValid(weapon) then
                 local userBuffsTable = GetAllStats(ply, "buffs")
@@ -2411,7 +2551,7 @@ local ReactionDamageStatusHandlers = {
                 end
 
                 if isRepelled then
-                    targetEffects["state"] = "repel"
+                    targetEffects["state"] = "block"
                     targetEffects["baseDamage"] = 0
                 end
 
@@ -2450,9 +2590,293 @@ local ReactionDamageStatusHandlers = {
 
                 targetEffects = HandleDamageMessage(targetEffects["ply"], targetEffects["target"], targetEffects)
 
-                if isRepelled then
-                    targetEffects["message"] = effectsTable["target"]:Name() .. " negated the attack!"
+                local currentHP = targetEffects["target"]:GetNWInt("TBCHP", 100)
+                local maxHP = targetEffects["target"]:GetNWInt("TBCMAXHP", 100)
+                local newHP
+
+                if targetEffects["state"] == "drain" then
+                    newHP = math.min(currentHP + targetEffects["baseDamage"], maxHP)
+                else
+                    newHP = currentHP - targetEffects["baseDamage"]
+                    HandleStatus(targetEffects["target"], targetEffects, "damageReaction", false, targetEffects)
                 end
+
+                targetEffects["target"]:SetNWInt("TBCHP", newHP)
+
+                weapon:AnnounceMessage(targetEffects["message"])
+
+                if newHP <= 0 then
+                    targetEffects["target"]:SetNWInt("TBCHP", 0)
+
+                    targetEffects["lifeState"] = "dead"
+                    targetEffects = HandleDeath(targetEffects["ply"], targetEffects["target"], targetEffects)
+                    targetEffects = HandleKill(targetEffects["ply"], targetEffects["target"], targetEffects)
+                end
+            end
+        end
+
+        return true
+    end,
+    High_Counter = function(ply, effectsTable, properties)
+        if ply then
+            if math.random(1, 100) > 40 then return true end
+
+            if not (effectsTable["Affinity"] and table.HasValue(Affinities.Physical, effectsTable["Affinity"])) then
+                return true
+            end
+
+            local weapon = ply:GetActiveWeapon()
+            if IsValid(weapon) then
+                local userBuffsTable = GetAllStats(ply, "buffs")
+                local userDebuffsTable = GetAllStats(ply, "debuffs")
+                local targetBuffsTable = GetAllStats(effectsTable["ply"], "buffs")
+                local targetDebuffsTable = GetAllStats(effectsTable["ply"], "debuffs")
+
+                local targetEffects = {}
+                targetEffects["baseDamage"] = effectsTable["baseDamage"] or 0
+                targetEffects["Affinity"] = "Almighty"
+
+                local playerLuck = ply:GetNWInt("TBCLuck", 10)
+                playerLuck =
+                    playerLuck +
+                    (HandleStatus(ply, userBuffsTable, "increaseLuck", playerLuck) -
+                        HandleStatus(ply, userDebuffsTable, "decreaseLuck", playerLuck))
+
+                local critBonus =
+                    (HandleStatus(ply, userBuffsTable, "increaseCritChance", targetEffects["baseDamage"]) -
+                    HandleStatus(ply, userDebuffsTable, "decreaseCritChance", targetEffects["baseDamage"]))
+
+                targetEffects["critChance"] = math.ceil((playerLuck / 2) + critBonus)
+
+                targetEffects["ply"] = ply
+                targetEffects["target"] = effectsTable["ply"]
+
+                targetEffects["userBuffsTable"] = userBuffsTable
+                targetEffects["userDebuffsTable"] = userDebuffsTable
+                targetEffects["targetBuffsTable"] = targetBuffsTable
+                targetEffects["targetDebuffsTable"] = targetDebuffsTable
+
+                targetEffects["state"] = "normal"
+
+                targetEffects = HandleResistances(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleWeaknesses(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleCrit(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleBlock(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleDrain(targetEffects["ply"], targetEffects["target"], targetEffects)
+
+                local repel = util.JSONToTable(targetEffects["target"]:GetNW2String("repel"))
+                local isRepelled = false
+
+                if
+                    targetEffects["targetBuffsTable"]["Tetrakarn"] and
+                        table.HasValue(Affinities.Physical, targetEffects["Affinity"])
+                 then
+                    RemoveStat(targetEffects["target"], "Tetrakarn", "buffs")
+                    targetEffects["targetBuffsTable"]["Tetrakarn"] = nil
+                    isRepelled = true
+                end
+
+                if
+                    targetEffects["targetBuffsTable"]["Makarakarn"] and
+                        table.HasValue(Affinities.Magic, targetEffects["Affinity"])
+                 then
+                    RemoveStat(targetEffects["target"], "Makarakarn", "buffs")
+                    targetEffects["targetBuffsTable"]["Makarakarn"] = nil
+                    isRepelled = true
+                end
+
+                if
+                    table.HasValue(repel, targetEffects["Affinity"]) or
+                        (table.HasValue(repel, "Magic") and table.HasValue(Affinities.Magic, targetEffects["Affinity"])) or
+                        (table.HasValue(repel, "Physical") and
+                            table.HasValue(Affinities.Physical, targetEffects["Affinity"]))
+                 then
+                    isRepelled = true
+                end
+
+                if isRepelled then
+                    targetEffects["state"] = "block"
+                    targetEffects["baseDamage"] = 0
+                end
+
+                targetEffects["baseDamage"] =
+                    targetEffects["baseDamage"] +
+                    (HandleStatus(
+                        targetEffects["ply"],
+                        targetEffects["userBuffsTable"],
+                        "damage",
+                        targetEffects["baseDamage"],
+                        targetEffects
+                    ) -
+                        HandleStatus(
+                            targetEffects["ply"],
+                            targetEffects["userDebuffsTable"],
+                            "decreaseDamage",
+                            targetEffects["baseDamage"],
+                            targetEffects
+                        )) -
+                    (HandleStatus(
+                        targetEffects["target"],
+                        targetEffects["targetBuffsTable"],
+                        "defenseDamage",
+                        targetEffects["baseDamage"],
+                        targetEffects
+                    ) -
+                        HandleStatus(
+                            targetEffects["target"],
+                            targetEffects["targetDebuffsTable"],
+                            "defenseDecrease",
+                            targetEffects["baseDamage"],
+                            targetEffects
+                        ))
+
+                targetEffects["baseDamage"] = math.ceil(targetEffects["baseDamage"])
+
+                targetEffects = HandleDamageMessage(targetEffects["ply"], targetEffects["target"], targetEffects)
+
+                local currentHP = targetEffects["target"]:GetNWInt("TBCHP", 100)
+                local maxHP = targetEffects["target"]:GetNWInt("TBCMAXHP", 100)
+                local newHP
+
+                if targetEffects["state"] == "drain" then
+                    newHP = math.min(currentHP + targetEffects["baseDamage"], maxHP)
+                else
+                    newHP = currentHP - targetEffects["baseDamage"]
+                    HandleStatus(targetEffects["target"], targetEffects, "damageReaction", false, targetEffects)
+                end
+
+                targetEffects["target"]:SetNWInt("TBCHP", newHP)
+
+                weapon:AnnounceMessage(targetEffects["message"])
+
+                if newHP <= 0 then
+                    targetEffects["target"]:SetNWInt("TBCHP", 0)
+
+                    targetEffects["lifeState"] = "dead"
+                    targetEffects = HandleDeath(targetEffects["ply"], targetEffects["target"], targetEffects)
+                    targetEffects = HandleKill(targetEffects["ply"], targetEffects["target"], targetEffects)
+                end
+            end
+        end
+
+        return true
+    end,
+    Counterstrike = function(ply, effectsTable, properties)
+        if ply then
+            if math.random(1, 100) > 25 then return true end
+
+            if not (effectsTable["Affinity"] and table.HasValue(Affinities.Physical, effectsTable["Affinity"])) then
+                return true
+            end
+
+            local weapon = ply:GetActiveWeapon()
+            if IsValid(weapon) then
+                local userBuffsTable = GetAllStats(ply, "buffs")
+                local userDebuffsTable = GetAllStats(ply, "debuffs")
+                local targetBuffsTable = GetAllStats(effectsTable["ply"], "buffs")
+                local targetDebuffsTable = GetAllStats(effectsTable["ply"], "debuffs")
+
+                local targetEffects = {}
+                targetEffects["baseDamage"] = 20
+                targetEffects["Affinity"] = "Almighty"
+
+                local playerLuck = ply:GetNWInt("TBCLuck", 10)
+                playerLuck =
+                    playerLuck +
+                    (HandleStatus(ply, userBuffsTable, "increaseLuck", playerLuck) -
+                        HandleStatus(ply, userDebuffsTable, "decreaseLuck", playerLuck))
+
+                local critBonus =
+                    (HandleStatus(ply, userBuffsTable, "increaseCritChance", targetEffects["baseDamage"]) -
+                    HandleStatus(ply, userDebuffsTable, "decreaseCritChance", targetEffects["baseDamage"]))
+
+                targetEffects["critChance"] = math.ceil((playerLuck / 2) + critBonus)
+
+                targetEffects["ply"] = ply
+                targetEffects["target"] = effectsTable["ply"]
+
+                targetEffects["userBuffsTable"] = userBuffsTable
+                targetEffects["userDebuffsTable"] = userDebuffsTable
+                targetEffects["targetBuffsTable"] = targetBuffsTable
+                targetEffects["targetDebuffsTable"] = targetDebuffsTable
+
+                targetEffects["state"] = "normal"
+
+                targetEffects = HandleResistances(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleWeaknesses(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleCrit(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleBlock(targetEffects["ply"], targetEffects["target"], targetEffects)
+                targetEffects = HandleDrain(targetEffects["ply"], targetEffects["target"], targetEffects)
+
+                local repel = util.JSONToTable(targetEffects["target"]:GetNW2String("repel"))
+                local isRepelled = false
+
+                if
+                    targetEffects["targetBuffsTable"]["Tetrakarn"] and
+                        table.HasValue(Affinities.Physical, targetEffects["Affinity"])
+                 then
+                    RemoveStat(targetEffects["target"], "Tetrakarn", "buffs")
+                    targetEffects["targetBuffsTable"]["Tetrakarn"] = nil
+                    isRepelled = true
+                end
+
+                if
+                    targetEffects["targetBuffsTable"]["Makarakarn"] and
+                        table.HasValue(Affinities.Magic, targetEffects["Affinity"])
+                 then
+                    RemoveStat(targetEffects["target"], "Makarakarn", "buffs")
+                    targetEffects["targetBuffsTable"]["Makarakarn"] = nil
+                    isRepelled = true
+                end
+
+                if
+                    table.HasValue(repel, targetEffects["Affinity"]) or
+                        (table.HasValue(repel, "Magic") and table.HasValue(Affinities.Magic, targetEffects["Affinity"])) or
+                        (table.HasValue(repel, "Physical") and
+                            table.HasValue(Affinities.Physical, targetEffects["Affinity"]))
+                 then
+                    isRepelled = true
+                end
+
+                if isRepelled then
+                    targetEffects["state"] = "block"
+                    targetEffects["baseDamage"] = 0
+                end
+
+                targetEffects["baseDamage"] =
+                    targetEffects["baseDamage"] +
+                    (HandleStatus(
+                        targetEffects["ply"],
+                        targetEffects["userBuffsTable"],
+                        "damage",
+                        targetEffects["baseDamage"],
+                        targetEffects
+                    ) -
+                        HandleStatus(
+                            targetEffects["ply"],
+                            targetEffects["userDebuffsTable"],
+                            "decreaseDamage",
+                            targetEffects["baseDamage"],
+                            targetEffects
+                        )) -
+                    (HandleStatus(
+                        targetEffects["target"],
+                        targetEffects["targetBuffsTable"],
+                        "defenseDamage",
+                        targetEffects["baseDamage"],
+                        targetEffects
+                    ) -
+                        HandleStatus(
+                            targetEffects["target"],
+                            targetEffects["targetDebuffsTable"],
+                            "defenseDecrease",
+                            targetEffects["baseDamage"],
+                            targetEffects
+                        ))
+
+                targetEffects["baseDamage"] = math.ceil(targetEffects["baseDamage"])
+
+                targetEffects = HandleDamageMessage(targetEffects["ply"], targetEffects["target"], targetEffects)
 
                 local currentHP = targetEffects["target"]:GetNWInt("TBCHP", 100)
                 local maxHP = targetEffects["target"]:GetNWInt("TBCMAXHP", 100)

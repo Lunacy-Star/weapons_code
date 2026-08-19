@@ -11,6 +11,12 @@ Passives = {
         description = "Bonus +10 damage to all Ice damage from user.",
         image = "materials/entities/smti_iceboost.png"
     },
+    Phys_Boost = {
+        name = "Phys Boost",
+        classname = "smti_physboost",
+        description = "Bonus +10 damage to all Physical damage from user.",
+        image = "materials/entities/smti_physboost.png"
+    },
     Light_Boost = {
         name = "Light Boost",
         classname = "smti_lightboost",
@@ -34,6 +40,12 @@ Passives = {
         classname = "smti_nukeboost",
         description = "Bonus +10 damage to all Nuke damage from user.",
         image = "materials/entities/smti_nukeboost.png"
+    },
+    Ruin_Boost = {
+        name = "Ruin Boost",
+        classname = "smti_ruinboost",
+        description = "Bonus +10 damage to all Ruin damage from user.",
+        image = "materials/entities/smti_ruinboost.png"
     },
     Charm_Boost = {
         name = "Charm Boost",
@@ -214,6 +226,54 @@ Passives = {
         classname = "smti_invigorate",
         description = "Recovers 5 MP each turn in battle.",
         image = "materials/entities/smti_invigorate.png"
+    },
+    Earth_Protection = {
+        name = "Earth Protection",
+        classname = "smti_earthprotection",
+        description = "After your first action of each turn, heal all allies for 15 HP.",
+        image = "materials/entities/smti_earthprotection.png"
+    },
+    Counter = {
+        name = "Counter",
+        classname = "smti_counter",
+        description = "When attacked by an enemy's Physical attack, 15% chance to deal 40 Physical damage to attacker. If this attack is repelled, it will be treated as if it were hitting a Block resistance instead.",
+        image = "materials/entities/smti_counter.png"
+    },
+    Counterstrike = {
+        name = "Counterstrike",
+        classname = "smti_counterstrike",
+        description = "25% chance to counterattack against physical attacks for 20 almighty damage.",
+        image = "materials/entities/smti_counterstrike.png"
+    },
+    Escape_Route = {
+        name = "Escape Route",
+        classname = "smti_escaperoute",
+        description = "40% increased chance of successful escape by user.",
+        image = "materials/entities/smti_escaperoute.png"
+    },
+    High_Counter = {
+        name = "High Counter",
+        classname = "smti_highcounter",
+        description = "40% chance of reflecting Physical Affinity actions targeting the user.",
+        image = "materials/entities/smti_highcounter.png"
+    },
+    Tidal_Wave = {
+        name = "Tidal Wave",
+        classname = "smti_tidalwave",
+        description = "When the user's party goes first in battle, grant all party members a Kaja based on the user's highest allocated stat. (Ties mean no Kaja is given.)",
+        image = "materials/entities/smti_tidalwave.png"
+    },
+    Relaxing_Wave = {
+        name = "Relaxing Wave",
+        classname = "smti_relaxingwave",
+        description = "Upon winning a fight, the user's party regenerates 15 SP. [CHR 4] The party regenerates 25 SP.",
+        image = "materials/entities/smti_relaxingwave.png"
+    },
+    On_Stage = {
+        name = "On Stage",
+        classname = "smti_onstage",
+        description = "Whenever a party member critically strikes or lands a successful weakness strike, they Heal for 20 HP and restore 10 SP.",
+        image = "materials/entities/smti_onstage.png"
     },
 
     Apt_Pupil = {
@@ -636,6 +696,828 @@ Personas = {
         passives = {},
         description = "A dog spirit said to possess people in Japanese lore. Those possessed are in a state of \"inu-tsuki\" and lose consciousness. Onmyoji use Inugami as familiars.",
         image = "materials/entities/persona_inugami.png"
+    },
+
+    persona_highpixie = {
+        name = "High Pixie",
+        classname = "persona_highpixie",
+        race = "Fairy",
+        arcana = "Fool",
+        resist = {"Force"},
+        weak = {"Nuclear"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_mazan_persona", "smti_media_persona",
+            "smti_pulinpa_persona", "smti_dormina_persona"
+        },
+        passives = {},
+        description = "The leader of a swarm of pixies. Any pixie in a leadership role or with remarkable power is called by this name.",
+        image = "materials/entities/persona_highpixie.png"
+    },
+
+    persona_agathion = {
+        name = "Agathion",
+        classname = "persona_agathion",
+        race = "Yoma",
+        arcana = "Star",
+        resist = {"Elec"},
+        weak = {"Force"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_zio_persona", "smti_amritadrop_persona",
+            "smti_lunge_persona", "smti_rakukaja_persona"
+        },
+        passives = {},
+        description = "A familiar with no corporeal form. There is no consensus on the actual appearance of an Agathion. When summoned they may resemble a human, bird, or animal. They are usually sealed away in bottles or pots, but can also inhabit rings or talismans. The word Agathion is also used as a general term for familiars.",
+        image = "materials/entities/persona_agathion.png"
+    },
+
+    persona_phoenix = {
+        name = "Phoenix",
+        classname = "persona_phoenix",
+        race = "Avian",
+        arcana = "Faith",
+        resist = {"Ice"},
+        weak = {"Elec", "Dark"},
+        block = {"Force"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_freila_persona", "smti_mafrei_persona", "smti_maragi_persona",
+            "smti_recarm_persona"
+        },
+        passives = {},
+        description = "The legendary bird of Chinese myth (also known as Feng Huang), said to appear only in times of peace. It is the ruler of all birds. When it dies, birds across the land chirp with sadness.",
+        image = "materials/entities/persona_phoenix.png"
+    },
+
+    persona_orobas = {
+        name = "Orobas",
+        classname = "persona_orobas",
+        race = "Beast",
+        arcana = "Hierophant",
+        resist = {"Gun", "Force"},
+        weak = {"Ruin", "Ice"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_sukukaja_persona", "smti_dekaja_persona",
+            "smti_maragi_persona", "smti_corkscrew_persona"
+        },
+        passives = {},
+        description = "One of the 72 demons of the Goetia. Known as the Prince of Hell, he appears as a horse and answers questions of the past, present, and future. He is faithful to his conjurer.",
+        image = "materials/entities/persona_orobas.png"
+    },
+
+    persona_sarasvati = {
+        name = "Sarasvati",
+        classname = "persona_sarasvati",
+        race = "Megami",
+        arcana = "Priestess",
+        resist = {"Elec"},
+        weak = {"Fire", "Nuclear"},
+        block = {"Ice"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_amritadrop_nonelemental_persona", "smti_dekunda_persona",
+            "smti_diarahan_persona"
+        },
+        passives = {
+            Invigorate = {
+                stacks = 1,
+                type = "turnRegen",
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_invigorate"
+            }
+        },
+        description = "The Hindu goddess who embodies the river. Her name means \"one who flows.\" She is also the goddess of music and art and is said to be skilled in every artistic or creative pursuit known to man.",
+        image = "materials/entities/persona_sarasvati.png"
+    },
+
+    persona_slime = {
+        name = "Slime",
+        classname = "persona_slime",
+        race = "Foul",
+        arcana = "Chariot",
+        resist = {"Gun", "Ruin"},
+        weak = {"Fire"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_lunge_persona", "smti_demonicgaze_persona",
+            "smti_maeiha_persona", "smti_corrosivefluid_persona"
+        },
+        passives = {},
+        description = "A primitive monster with a viscous body. There are various theories as to its origin, but it is still under debate. Said to compulsively collect shiny objects.",
+        image = "materials/entities/persona_slime.png"
+    },
+
+    persona_slimedevil = {
+        name = "Slime (Devil)",
+        classname = "persona_slimedevil",
+        race = "Foul",
+        arcana = "Devil",
+        resist = {"Blunt", "Martial Arts", "Bow", "Gun", "Throw"},
+        weak = {"Fire", "Ice", "Elec", "Force", "Nuclear"},
+        block = {"Blade"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_provoke_persona", "smti_lifedrain_persona",
+            "smti_poisonbreath_persona"
+        },
+        passives = {
+            Life_Bonus = {
+                stacks = 1,
+                maxHPBonus = 50,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_lifebonus"
+            }
+        },
+        description = "A primitive monster with a viscous body. There are various theories as to its origin, but it is still under debate. Said to compulsively collect shiny objects. These Slimes are more physically durable than their smaller counterparts, but can also be greedier and more volatile.",
+        image = "materials/entities/persona_slimedevil.png"
+    },
+
+    persona_kodama = {
+        name = "Kodama",
+        classname = "persona_kodama",
+        race = "Earth Element",
+        arcana = "Star",
+        resist = {"Magic"},
+        weak = {"Gun", "Bow"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {"smti_lunge_persona"},
+        passives = {
+            Earth_Protection = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_earthprotection"
+            },
+            Panic_Boost = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_panicboost"
+            },
+            Ruin_Boost = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_ruinboost"
+            }
+        },
+        description = "Inside your walls",
+        image = "materials/entities/persona_kodama.png"
+    },
+
+    persona_jackolantern = {
+        name = "Jack-o-Lantern",
+        classname = "persona_jackolantern",
+        race = "Fairy",
+        arcana = "Magician",
+        resist = {},
+        weak = {"Ice"},
+        block = {},
+        drain = {"Fire"},
+        repel = {},
+        skills = {
+            "smti_maragi_persona", "smti_firewall_persona",
+            "smti_firebreak_persona", "smti_dynamicagilao_persona"
+        },
+        passives = {},
+        description = "An Irish spirit typically found in swamps, bogs, or marshes. Said to be spirits of the dead, they appear as floating flames and are known around the world by various names such as \"Will-o'-the-Wisp\" and \"Hitodama.\" They are also said to come out at night to startle travelers and make them lose their way. Alternatively known by some as \"Pyro Jack\".",
+        image = "materials/entities/persona_jackolantern.png"
+    },
+
+    persona_lilim = {
+        name = "Lilim",
+        classname = "persona_lilim",
+        race = "Night",
+        arcana = "Devil",
+        resist = {"Ruin"},
+        weak = {"Light"},
+        block = {"Dark"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_mabufula_persona", "smti_marinkarin_persona",
+            "smti_dreamneedle_mpcost_persona"
+        },
+        passives = {
+            Mana_Bonus = {
+                stacks = 1,
+                maxMPBonus = 50,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_manabonus"
+            }
+        },
+        description = "A demon who tempts sleeping men and attacks infants. She is the daughter of the demoness, Lilith. Like her mother, she drains men of their essence.",
+        image = "materials/entities/persona_lilim.png"
+    },
+
+    persona_blackooze = {
+        name = "Black Ooze",
+        classname = "persona_blackooze",
+        race = "Foul",
+        arcana = "Moon",
+        resist = {"Physical"},
+        weak = {"Elec", "Light"},
+        block = {"Dark"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_tarunda_persona", "smti_headbutt_persona",
+            "smti_highpressure_persona", "smti_demonteethgrind_persona"
+        },
+        passives = {},
+        description = "An amoeba-like monster that attacks and eats people. Supposedly, it is actually a demon that failed to take form. It is said that when a Slime's ability to absorb an unknown life force goes out of control, it transforms into a Black Ooze.",
+        image = "materials/entities/persona_blackooze.png"
+    },
+
+    persona_succubus = {
+        name = "Succubus",
+        classname = "persona_succubus",
+        race = "Night",
+        arcana = "Devil",
+        resist = {"Fire"},
+        weak = {"Light"},
+        block = {"Ice"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_bufula_persona", "smti_spiritdrain_persona",
+            "smti_dormina_standard_persona", "smti_dekaja_persona"
+        },
+        passives = {},
+        description = "Originating in European folklore, the Succubus is the female counterpart to the Incubus. They visit men in their dreams sucking the life force out of them. The victims remain asleep but may dream of the encounters.",
+        image = "materials/entities/persona_succubus.png"
+    },
+
+    persona_chatterskull = {
+        name = "Chatterskull",
+        classname = "persona_chatterskull",
+        race = "Haunt",
+        arcana = "Devil",
+        resist = {"Fire"},
+        weak = {"Light", "Ruin"},
+        block = {"Dark"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_mudoon_persona", "smti_berserk_persona",
+            "smti_discord_persona", "smti_dekaja_persona"
+        },
+        passives = {},
+        description = "A creature of folklore from Dominica. It is a living skull that gives out a piercing laugh. It is said that the hearts of those who hear its laugh will immediately stop.",
+        image = "materials/entities/persona_chatterskull.png"
+    },
+
+    persona_oni = {
+        name = "Oni",
+        classname = "persona_oni",
+        race = "Brute",
+        arcana = "Strength",
+        resist = {"Physical"},
+        weak = {"Elec", "Light"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_herculeanstrike_persona", "smti_giantslice_standard_persona",
+            "smti_powercharge_persona"
+        },
+        passives = {
+            Counter = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_counter"
+            }
+        },
+        description = "An evil monster from Japanese lore known for its hideous appearance and brute strength. They loot and plunder villages, massacring the townspeople with their iron clubs.",
+        image = "materials/entities/persona_oni.png"
+    },
+
+    persona_angel = {
+        name = "Angel",
+        classname = "persona_angel",
+        race = "Divine",
+        arcana = "Justice",
+        resist = {},
+        weak = {"Force", "Dark"},
+        block = {"Light"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_hama_persona", "smti_patra_persona", "smti_diarama_persona",
+            "smti_recarm_persona"
+        },
+        passives = {},
+        description = "Ninth of the nine orders of angels. They are closest in nature to humans. They watch over individuals and offer warning to those who stray from the path.",
+        image = "materials/entities/persona_angel.png"
+    },
+
+    persona_palladion = {
+        name = "Palladion",
+        classname = "persona_palladion",
+        race = "",
+        arcana = "Aeon",
+        resist = {"Bow", "Gun"},
+        weak = {"Elec"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_tarukaja_persona", "smti_sukukaja_persona",
+            "smti_dekunda_persona", "smti_mafrei_persona"
+        },
+        passives = {},
+        description = "A palladium, or palladion, was an image of great antiquity on which the safety of a city was said to depend that appear in Greek and Roman mythology. The word \"palladium\" has meant anything believed to provide protection or safety, or a safeguard, therefore similar to the word \"aegis.\"",
+        image = "materials/entities/persona_palladion.png"
+    },
+
+    persona_castor = {
+        name = "Castor",
+        classname = "persona_castor",
+        race = "",
+        arcana = "Moon",
+        resist = {"Blunt"},
+        weak = {"Bow"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_heatwave_persona", "smti_bloodycharge_persona",
+            "smti_assaultdive_persona"
+        },
+        passives = {
+            Regenerate = {
+                stacks = 1,
+                type = "turnRegen",
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_regenerate"
+            }
+        },
+        description = "Castor was the elder twin brother of Polydeuces and part of the Argonauts. Both Castor and Polydeuces had the same mother, Leda, but Polydeuces' father was Zeus, while Castor's father was a mortal man named Tyndareus.",
+        image = "materials/entities/persona_castor.png"
+    },
+
+    persona_cerberus = {
+        name = "Cerberus",
+        classname = "persona_cerberus",
+        race = "",
+        arcana = "Strength",
+        resist = {},
+        weak = {"Ice", "Light"},
+        block = {"Fire", "Dark"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_maragi_persona", "smti_mudo_dualcondition_persona",
+            "smti_demonicgaze_persona"
+        },
+        passives = {
+            Counterstrike = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_counterstrike"
+            }
+        },
+        description = "The guardian hound of Hades in Greek lore. It traditionally has three heads and a snake's tail. It was born from Typhon, the giant of wind, and Echidna, the mother of monsters, and is also the older brother of Orthrus.",
+        image = "materials/entities/persona_cerberus.png"
+    },
+
+    persona_nemesis = {
+        name = "Nemesis",
+        classname = "persona_nemesis",
+        race = "",
+        arcana = "Justice",
+        resist = {"Light"},
+        weak = {"Dark"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_lunge_persona", "smti_zionga_persona",
+            "smti_makouha_persona", "smti_hama_dualcondition_persona"
+        },
+        passives = {},
+        description = "Nemesis was the ancient Greek goddess of divine retribution against those who succumb to pride and arrogance. She is the daughter of Erebus and Nyx.",
+        image = "materials/entities/persona_nemesis.png"
+    },
+
+    persona_lucia = {
+        name = "Lucia",
+        classname = "persona_lucia",
+        race = "",
+        arcana = "Priestess",
+        resist = {"Light"},
+        weak = {"Dark"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_dekunda_persona", "smti_lustercandy_persona",
+            "smti_mediarama_persona"
+        },
+        passives = {
+            Escape_Route = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_escaperoute"
+            }
+        },
+        description = "A Christian martyr who died during the Diocletianic Persecution. She is venerated as the patron saint of the blind. Lucia may also be seen as a figure of illuminating grace, mercy or even justice.",
+        image = "materials/entities/persona_lucia.png"
+    },
+
+    persona_polydeuces = {
+        name = "Polydeuces",
+        classname = "persona_polydeuces",
+        race = "",
+        arcana = "Emperor",
+        resist = {"Elec"},
+        weak = {"Ice"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_sukunda_persona", "smti_rakunda_polydeuces_persona",
+            "smti_sonicpunch_persona", "smti_zionga_techbonus_persona"
+        },
+        passives = {},
+        description = "Polydeuces (also known as Pollux) was the younger twin brother of Castor and both were known as the Dioscuri or Hero Twins.",
+        image = "materials/entities/persona_polydeuces.png"
+    },
+
+    persona_penthesilea = {
+        name = "Penthesilea",
+        classname = "persona_penthesilea",
+        race = "",
+        arcana = "Empress",
+        resist = {"Ice"},
+        weak = {"Fire"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_marinkarin_persona", "smti_bufula_techbonus_persona",
+            "smti_mindcharge_penthesilea_persona"
+        },
+        passives = {
+            Ice_Boost = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_iceboost"
+            }
+        },
+        description = "Penthesilea is one of the Amazonian queens that appear in Greek mythology. She is the daughter of Ares, the Greek god of war, and Otrera, queen and founder of the Amazons.",
+        image = "materials/entities/persona_penthesilea.png"
+    },
+
+    persona_io = {
+        name = "Io",
+        classname = "persona_io",
+        race = "",
+        arcana = "Lovers",
+        resist = {"Wind"},
+        weak = {"Elec"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_diarama_reduced_persona", "smti_zanma_persona",
+            "smti_mepatra_reduced_persona", "smti_recarm_persona"
+        },
+        passives = {},
+        description = "Io was the priestess to Hera, wife of Zeus, king of the gods.",
+        image = "materials/entities/persona_io.png"
+    },
+
+    persona_hermes = {
+        name = "Hermes",
+        classname = "persona_hermes",
+        race = "",
+        arcana = "Magician",
+        resist = {"Fire"},
+        weak = {"Wind"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_rakukaja_persona", "smti_torrentshot_persona",
+            "smti_bladeoffury_persona"
+        },
+        passives = {
+            Counterstrike = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_counterstrike"
+            }
+        },
+        description = "Hermes, the youngest of the Twelve Olympians, is the messenger of the gods in the ancient Greece. He is the offspring of Zeus and Maia, and also recognized as the patron of travelers, commerce, athletics, literature and poets, sometimes of healing and invention, even of thieves and liars.",
+        image = "materials/entities/persona_hermes.png"
+    },
+
+    persona_orpheusf = {
+        name = "Orpheus (F)",
+        classname = "persona_orpheusf",
+        race = "",
+        arcana = "Fool",
+        resist = {"Fire"},
+        weak = {"Elec", "Dark"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_criticaleye_persona", "smti_tarunda_persona",
+            "smti_maragi_techbonus_persona"
+        },
+        passives = {
+            Endure = {
+                stacks = 1,
+                type = "deathState",
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_endure"
+            }
+        },
+        description = "A poet of Greek mythology skilled with the lyre. He tried to retrieve his wife, Eurydice, from Hades, but she vanished when he looked back before reaching the surface.",
+        image = "materials/entities/persona_orpheusf.png"
+    },
+
+    persona_orpheusm = {
+        name = "Orpheus (M)",
+        classname = "persona_orpheusm",
+        race = "",
+        arcana = "Fool",
+        resist = {"Fire"},
+        weak = {"Elec", "Dark"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_assaultdive_blade_persona", "smti_agilao_techbonus_persona",
+            "smti_tarunda_persona"
+        },
+        passives = {
+            Endure = {
+                stacks = 1,
+                type = "deathState",
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_endure"
+            }
+        },
+        description = "A poet of Greek mythology skilled with the lyre. He tried to retrieve his wife, Eurydice, from Hades, but she vanished when he looked back before reaching the surface.",
+        image = "materials/entities/persona_orpheusm.png"
+    },
+
+    persona_konohanasakuya = {
+        name = "Konohana Sakuya",
+        classname = "persona_konohanasakuya",
+        race = "",
+        arcana = "Priestess",
+        resist = {"Fire"},
+        weak = {"Ice"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_recarm_reduced_persona", "smti_agilao_mpdiscount_persona",
+            "smti_mindcharge_penthesilea_persona"
+        },
+        passives = {
+            Fire_Boost = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_fireboost"
+            }
+        },
+        description = "The daughter of the mountain god Ouyamatsumi. When she became Ninigi's wife and grew pregnant on the first night of their marriage, he accused her of infidelity. She stood in a burning hut, claiming that the fire would not touch her if she had been faithful, and emerged unscathed. Her emblem is the cherry blossom.",
+        image = "materials/entities/persona_konohanasakuya.png"
+    },
+
+    persona_tomoe = {
+        name = "Tomoe",
+        classname = "persona_tomoe",
+        race = "",
+        arcana = "Chariot",
+        resist = {"Ice"},
+        weak = {"Fire"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_powercharge_strong_persona", "smti_skullcracker_persona"
+        },
+        passives = {
+            Phys_Boost = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_physboost"
+            },
+            High_Counter = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_highcounter"
+            }
+        },
+        description = "Was a female samurai during the time of the Genpei War (1180-1185). After fighting in the Battle of Awazu, it is unclear what happened to her.",
+        image = "materials/entities/persona_tomoe.png"
+    },
+
+    persona_arsene = {
+        name = "Arsene",
+        classname = "persona_arsene",
+        race = "",
+        arcana = "Fool",
+        resist = {"Dark"},
+        weak = {"Light"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_sukunda_persona", "smti_cleave_persona",
+            "smti_maeiga_persona", "smti_dreamneedle_canonical_persona"
+        },
+        passives = {},
+        description = "A being based off the main character of Maurice Leblanc's novels, Arsène Lupin. He appears everywhere and is a master of disguise. He is known to help law-abiding citizens.",
+        image = "materials/entities/persona_arsene.png"
+    },
+
+    persona_himiko = {
+        name = "Himiko",
+        classname = "persona_himiko",
+        race = "",
+        arcana = "Lovers",
+        resist = {"Elec"},
+        weak = {"Gun", "Physical"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {"smti_zeroset_persona", "smti_spotlight_persona"},
+        passives = {
+            Tidal_Wave = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_tidalwave"
+            },
+            Relaxing_Wave = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_relaxingwave"
+            },
+            On_Stage = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_onstage"
+            }
+        },
+        description = "An obscure shaman queen of Yamataikoku, an ancient country within the islands that would become Japan. Her skills in magic and sorcery were highly respected by her people.",
+        image = "materials/entities/persona_himiko.png"
+    },
+
+    persona_captainkidd = {
+        name = "Captain Kidd",
+        classname = "persona_captainkidd",
+        race = "",
+        arcana = "Chariot",
+        resist = {"Elec"},
+        weak = {"Wind"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_tarukaja_persona", "smti_lunge_persona",
+            "smti_headbutt_persona", "smti_elecbreak_persona"
+        },
+        passives = {},
+        description = "A 17th century privateer who eventually became a world-renowned pirate. At his execution, he declared he had a hidden treasure, leaving behind many legends.",
+        image = "materials/entities/persona_captainkidd.png"
+    },
+
+    persona_eros = {
+        name = "Eros",
+        classname = "persona_eros",
+        race = "",
+        arcana = "Lovers",
+        resist = {},
+        weak = {"Force"},
+        block = {"Light"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_diarama_persona", "smti_marinkarin_persona",
+            "smti_makarakarn_persona"
+        },
+        passives = {
+            Invigorate = {
+                stacks = 1,
+                type = "turnRegen",
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_invigorate"
+            }
+        },
+        description = "Eros is the mischievous god of love and desire in the ancient Greece and the counterpart of the Roman god, Cupid. According to Hesiod's Theogony, Eros was the fourth god to come into existence, coming after Chaos, Gaia, and Tartarus.",
+        image = "materials/entities/persona_eros.png"
+    },
+
+    persona_rhadamanthus = {
+        name = "Rhadamanthus",
+        classname = "persona_rhadamanthus",
+        race = "",
+        arcana = "Death",
+        resist = {},
+        weak = {"Fire"},
+        block = {"Dark"},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_bufula_dexchr_persona", "smti_tetraja_persona",
+            "smti_zanma_mpdiscount_persona", "smti_maeiga_persona"
+        },
+        passives = {},
+        description = "The son of Zeus and Europa in Greek mythology. He was a wise king of Crete who, after death, became one of the judges of the dead in the Greek underworld, Hades.",
+        image = "materials/entities/persona_rhadamanthus.png"
+    },
+
+    persona_jiraiya = {
+        name = "Jiraiya",
+        classname = "persona_jiraiya",
+        race = "",
+        arcana = "Magician",
+        resist = {"Wind"},
+        weak = {"Elec"},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_sukukaja_persona", "smti_mazan_mpdiscount_persona",
+            "smti_forcebreak_persona"
+        },
+        passives = {
+            Force_Boost = {
+                stacks = 1,
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_forceboost"
+            }
+        },
+        description = "",
+        image = "materials/entities/persona_jiraiya.png"
+    },
+
+    persona_sukunahikona = {
+        name = "Sukuna-Hikona",
+        classname = "persona_sukunahikona",
+        race = "",
+        arcana = "Fortune",
+        resist = {"Light", "Dark"},
+        weak = {},
+        block = {},
+        drain = {},
+        repel = {},
+        skills = {
+            "smti_mudo_dualcondition_persona",
+            "smti_mindcharge_penthesilea_persona", "smti_makarakarn_persona"
+        },
+        passives = {
+            Invigorate = {
+                stacks = 1,
+                type = "turnRegen",
+                SlotsTaking = 1,
+                SlotType = "Equipment",
+                ClassName = "smti_invigorate"
+            }
+        },
+        description = "",
+        image = "materials/entities/persona_sukunahikona.png"
     }
 }
 

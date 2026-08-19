@@ -43,14 +43,14 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 function SWEP:Initialize() self:SetHoldType("melee") end
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 0.4)
+    self:SetNextPrimaryFire(CurTime() + 1)
 
     local ply = self:GetOwner()
 
     ply:LagCompensation(true)
 
     local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 65
+    local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
     local tmin = Vector(1, 1, 1) * -10
     local tmax = Vector(1, 1, 1) * 10

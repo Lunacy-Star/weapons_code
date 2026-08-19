@@ -433,7 +433,11 @@ CHARACTERS.List = {
             "smti_unarmedfists",
             "smti_novacyther",
             "smti_twohandedsword"
+        },        
+        loadoutItems = {
+            "persona_hermes"
         },
+        essence = 1,
         command = "tatsuya_suou",
         type = "Human",
         race = "persona_user",
@@ -614,6 +618,10 @@ CHARACTERS.List = {
             "smti_cadenza",
             "smti_twohandedsword"
         },
+        loadoutItems = {
+            "persona_orpheusm"
+        },
+        essence = 1,
         command = "makoto_yuki",
         type = "Human",
         race = "sees",
@@ -655,6 +663,10 @@ CHARACTERS.List = {
             "smti_healingharp",
             "smti_lanceofvitality"
         },
+        loadoutItems = {
+            "persona_orpheusf"
+        },
+        essence = 1,
         command = "kotone_shiomi",
         type = "Human",
         race = "sees",
@@ -700,6 +712,10 @@ CHARACTERS.List = {
                 ClassName = "smti_triangledrill"
             }
         },
+        loadoutItems = {
+            "persona_hermes"
+        },
+        essence = 1,
         command = "junpei_iori",
         type = "Human",
         race = "sees",
@@ -740,6 +756,10 @@ CHARACTERS.List = {
                 ClassName = "smti_anchorpoint"
             }
         },
+        loadoutItems = {
+            "persona_io"
+        },
+        essence = 1,
         command = "yukari_takeba",
         type = "Human",
         race = "sees",
@@ -785,6 +805,10 @@ CHARACTERS.List = {
                 ClassName = "smti_thirdintention"
             }
         },
+        loadoutItems = {
+            "persona_panthesilea"
+        },
+        essence = 1,
         command = "mitsuru_kirijo",
         type = "Human",
         race = "sees",
@@ -825,6 +849,10 @@ CHARACTERS.List = {
                 ClassName = "smti_eightcount"
             }
         },
+        loadoutItems = {
+            "persona_polydeuces"
+        },
+        essence = 1,
         command = "akihiko_sanada",
         type = "Human",
         race = "sees",
@@ -867,6 +895,10 @@ CHARACTERS.List = {
                 ClassName = "smti_healingwave"
             }
         },
+        loadoutItems = {
+            "persona_lucia"
+        },
+        essence = 1,
         command = "fuuka_yamagishi",
         type = "Human",
         race = "sees",
@@ -907,6 +939,10 @@ CHARACTERS.List = {
                 ClassName = "smti_premonition"
             }
         },
+        loadoutItems = {
+            "persona_nemesis"
+        },
+        essence = 1,
         command = "ken_amada",
         type = "Human",
         race = "sees",
@@ -947,6 +983,10 @@ CHARACTERS.List = {
                 ClassName = "smti_shrineguardian"
             }
         },
+        loadoutItems = {
+            "persona_cerberus"
+        },
+        essence = 1,
         command = "koromaru",
         type = "Human",
         race = "sees",
@@ -987,6 +1027,10 @@ CHARACTERS.List = {
                 ClassName = "smti_suppressor"
             }
         },
+        loadoutItems = {
+            "persona_castor"
+        },
+        essence = 1,
         command = "shinjiro_aragaki",
         type = "Human",
         race = "sees",
@@ -1033,6 +1077,10 @@ CHARACTERS.List = {
                 ClassName = "smti_papillonheart"
             }
         },
+        loadoutItems = {
+            "persona_palladion"
+        },
+        essence = 1,
         command = "aigis",
         type = "Human",
         race = "sees",
@@ -1110,6 +1158,10 @@ CHARACTERS.List = {
             "smti_elecrush",
             "smti_twinklestar"
         },
+        loadoutItems = {
+            "persona_himiko"
+        },
+        essence = 1,
         command = "rise_kujikawa",
         type = "Human",
         race = "student",
@@ -1389,6 +1441,10 @@ CHARACTERS.List = {
                 ClassName = "smti_pinchanchor"
             }
         },
+        loadoutItems = {
+            "persona_arsene"
+        },
+        essence = 1,
         command = "ren_amamiya",
         type = "Human",
         race = "phantom_thieves",
@@ -1435,6 +1491,10 @@ CHARACTERS.List = {
                 ClassName = "smti_ragingtemper"
             }
         },
+        loadoutItems = {
+            "persona_captainkidd"
+        },
+        essence = 1,
         command = "ryuji_sakamoto",
         type = "Human",
         race = "phantom_thieves",

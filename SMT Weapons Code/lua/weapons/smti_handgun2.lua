@@ -20,7 +20,7 @@ SWEP.Primary.Spread = 0.1
 SWEP.Primary.NumberofShots = 1
 SWEP.Primary.Automatic = true
 SWEP.Primary.Recoil = .2
-SWEP.Primary.Delay = 0.2
+SWEP.Primary.Delay = 1
 SWEP.Primary.Force = 100
 
 SWEP.Secondary.ClipSize		= -1

@@ -26,6 +26,100 @@ local function TBC_GetFightPlayers(fight)
     return playersInFight
 end
 
+local function TBC_IsFightMemberAlive(member)
+    return IsValid(member) and member:GetNWInt("TBCHP", 0) > 0
+end
+
+local function TBC_FindNextAliveMember(fight, sideKey)
+    local side = fight[sideKey]
+    local count = #side
+    if count == 0 then
+        return
+    end
+
+    for _ = 1, count do
+        fight.ActiveMember = fight.ActiveMember + 1
+        if fight.ActiveMember > count then
+            fight.ActiveMember = 1
+        end
+
+        if TBC_IsFightMemberAlive(side[fight.ActiveMember]) then
+            return
+        end
+    end
+end
+
+local function TBC_EnsureActiveMemberAlive(fight, sideKey)
+    local side = fight[sideKey]
+    local count = #side
+    if count == 0 then
+        return
+    end
+
+    if not fight.ActiveMember or fight.ActiveMember < 1 or fight.ActiveMember > count then
+        fight.ActiveMember = 1
+    end
+
+    if TBC_IsFightMemberAlive(side[fight.ActiveMember]) then
+        return
+    end
+
+    TBC_FindNextAliveMember(fight, sideKey)
+end
+
+-- Advances to the next member on sideKey. A dead member's slot still spends
+-- one turn from fight.TurnCounter as it's passed over - it's not free just
+-- because they can't act - and the walk stops the moment the pool runs out,
+-- even if that lands mid-skip with no alive member found (the cycle ends
+-- and the side swap picks up from there), so a dead teammate's turn is
+-- consumed rather than being handed to whoever's next.
+local function TBC_AdvanceActiveMember(fight, sideKey)
+    local side = fight[sideKey]
+    local count = #side
+    if count == 0 then
+        return
+    end
+
+    for _ = 1, count do
+        fight.ActiveMember = fight.ActiveMember + 1
+        if fight.ActiveMember > count then
+            fight.ActiveMember = 1
+        end
+
+        if TBC_IsFightMemberAlive(side[fight.ActiveMember]) then
+            return
+        end
+
+        fight.TurnCounter = fight.TurnCounter - 1
+        if fight.TurnCounter <= 0 then
+            return
+        end
+    end
+end
+
+local function TBC_RemovePlayerFromSide(fight, sideKey, player)
+    local side = fight[sideKey]
+    for i, member in ipairs(side) do
+        if member == player then
+            table.remove(side, i)
+
+            if sideKey == fight.ActiveSide and fight.ActiveMember then
+                if i < fight.ActiveMember then
+                    fight.ActiveMember = fight.ActiveMember - 1
+                end
+
+                if fight.ActiveMember > #side then
+                    fight.ActiveMember = 1
+                end
+            end
+
+            return true
+        end
+    end
+
+    return false
+end
+
 function TBCWeaponMetatable:AnnounceAbility()
     local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
     if not fight then
@@ -750,6 +844,48 @@ function TBCWeaponMetatable:StartFight(target)
                         end
                     end
                 end
+                -- Tidal Wave: if a member of the side going first carries this
+                -- passive, grant that whole side a Kaja based on the bearer's
+                -- highest allocated stat (STR->Tarukaja, DEX->Sukukaja,
+                -- CHR->Rakukaja). A tie between stats grants no Kaja.
+                for _, player in ipairs(fight[fight.ActiveSide]) do
+                    if IsValid(player) then
+                        local permaBuffs = GetAllStats(player, "permabuffs")
+                        if permaBuffs and permaBuffs["Tidal_Wave"] then
+                            local playerStr = tonumber(player:GetNWInt("TBCSTR", 0))
+                            local playerDex = tonumber(player:GetNWInt("TBCDEX", 0))
+                            local playerChr = tonumber(player:GetNWInt("TBCCHR", 0))
+
+                            local kajaBuff = nil
+                            if playerStr > playerDex and playerStr > playerChr then
+                                kajaBuff = "Tarukaja"
+                            elseif playerDex > playerStr and playerDex > playerChr then
+                                kajaBuff = "Sukukaja"
+                            elseif playerChr > playerStr and playerChr > playerDex then
+                                kajaBuff = "Rakukaja"
+                            end
+
+                            if kajaBuff then
+                                for _, sidePlayer in ipairs(fight[fight.ActiveSide]) do
+                                    if IsValid(sidePlayer) then
+                                        local sideBuffsTable = GetAllStats(sidePlayer, "buffs")
+                                        if sideBuffsTable[kajaBuff] then
+                                            sideBuffsTable[kajaBuff].stacks =
+                                                math.min(sideBuffsTable[kajaBuff].stacks + 1, 4)
+                                        else
+                                            sideBuffsTable[kajaBuff] = {stacks = 1}
+                                        end
+                                        AssignStat(sidePlayer, kajaBuff, sideBuffsTable[kajaBuff], "buffs")
+                                    end
+                                end
+
+                                self:AnnounceMessage(
+                                    player:Name() .. "'s Tidal Wave grants the party " .. kajaBuff .. "!"
+                                )
+                            end
+                        end
+                    end
+                end
             end
             fight.Started = true -- Set the fight as started after the timer
 
@@ -828,14 +964,12 @@ function TBCWeaponMetatable:NextTurn(timerSkip)
 
             RemoveStat(currentTurnPlayer, "One_More", "buffs")
             RemoveStat(currentTurnPlayer, "Baton_Pass", "buffs")
+            currentTurnPlayer.TBC_EarthProtectionUsedThisTurn = nil
         end
 
         fight.TurnCounter = fight.TurnCounter - 1
-        fight.ActiveMember = fight.ActiveMember + 1
+        TBC_AdvanceActiveMember(fight, currentActiveSide)
 
-        if fight.ActiveMember > #fight[currentActiveSide] then
-            fight.ActiveMember = 1
-        end
         if SERVER and fight.TurnCounter > 0 then
             local currentTurnPlayer = fight[currentActiveSide][fight.ActiveMember]
 
@@ -865,6 +999,7 @@ function TBCWeaponMetatable:NextTurn(timerSkip)
 
         -- Update the currentActiveSide for the next turn
         fight.ActiveSide = newActiveSide
+        TBC_EnsureActiveMemberAlive(fight, fight.ActiveSide)
 
         local turnsCounter = 0
         for _, player in ipairs(fight[fight.ActiveSide]) do
@@ -887,60 +1022,6 @@ function TBCWeaponMetatable:NextTurn(timerSkip)
             self:AilmentCheck(currentTurnPlayer, "cycle")
             fight.AFKRequests = {} -- Clear the AFKRequests table if no action was taken.
         end
-    end
-end
-
--- Advances the active member to the next party member on the current side,
--- exactly like NextTurn, but does NOT spend from fight.TurnCounter. Used by
--- abilities that let a character pass their turn for free (e.g. Tag).
-function TBCWeaponMetatable:FreeNextTurn()
-    local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
-    if not fight then
-        self.Owner:ChatPrint("Fight not found.")
-        return
-    end
-
-    local currentActiveSide = fight.ActiveSide
-
-    if timer.Exists(self.FightId) then
-        timer.Start(self.FightId)
-    else
-        timer.Create(
-            self.FightId,
-            180,
-            0,
-            function()
-                self:AnnounceMessage("Time's up! Skipping turn.")
-                self:NextTurn(true)
-                fight.AFKRequests = {}
-            end
-        )
-    end
-
-    if SERVER then
-        local currentTurnPlayer = fight[currentActiveSide][fight.ActiveMember]
-        RemoveStat(currentTurnPlayer, "One_More", "buffs")
-        RemoveStat(currentTurnPlayer, "Baton_Pass", "buffs")
-    end
-
-    fight.ActiveMember = fight.ActiveMember + 1
-    if fight.ActiveMember > #fight[currentActiveSide] then
-        fight.ActiveMember = 1
-    end
-
-    for _, player in ipairs(fight.Side1) do
-        if IsValid(player) then player:EmitSound("common/stuck1.wav") end
-    end
-
-    for _, player in ipairs(fight.Side2) do
-        if IsValid(player) then player:EmitSound("common/stuck1.wav") end
-    end
-
-    if SERVER then
-        local nextTurnPlayer = fight[currentActiveSide][fight.ActiveMember]
-        self:AnnounceMessage("It's " .. nextTurnPlayer:Name() .. "'s turn!")
-        self:AilmentCheck(nextTurnPlayer, "turn")
-        fight.AFKRequests = {}
     end
 end
 
@@ -1121,6 +1202,38 @@ function TBCWeaponMetatable:CheckForTeamDefeat(fightId)
                 end
             end
 
+            -- Relaxing Wave: if a member of the winning side carries this
+            -- passive, restore SP to the entire winning side.
+            if allDeadSide1 or allDeadSide2 then
+                local winningMembers = allDeadSide1 and side2Members or side1Members
+
+                local relaxingWaveAmount = nil
+                for _, member in ipairs(winningMembers) do
+                    if IsValid(member) then
+                        local permaBuffs = GetAllStats(member, "permabuffs")
+                        if permaBuffs and permaBuffs["Relaxing_Wave"] then
+                            local memberChr = tonumber(member:GetNWInt("TBCCHR", 0))
+                            local amount = 15
+                            if memberChr >= 4 then amount = 25 end
+
+                            if not relaxingWaveAmount or amount > relaxingWaveAmount then
+                                relaxingWaveAmount = amount
+                            end
+                        end
+                    end
+                end
+
+                if relaxingWaveAmount then
+                    for _, member in ipairs(winningMembers) do
+                        if IsValid(member) then
+                            local currentMP = member:GetNWInt("TBCMP", 100)
+                            local maxMP = member:GetNWInt("TBCMAXMP", 100)
+                            member:SetNWInt("TBCMP", math.min(currentMP + relaxingWaveAmount, maxMP))
+                        end
+                    end
+                end
+            end
+
             -- Mark the victory message as sent for this fight
             victoryMessageSent[fightId] = true
         end
@@ -1186,34 +1299,30 @@ function TBCWeaponMetatable:Escape()
     local escapeChance = 20 + math.ceil(playerLuck / 2) + escapeBonus
 
     if math.random(1, 100) <= escapeChance then
-        for _, players in ipairs(sides) do -- Iterate over Side1 and Side2
-            for i, player in ipairs(players) do
-                if player == ply then
-                    table.remove(players, i)
-
-                    -- The escapee's demon companions flee with them
-                    if DEMONCOMP and DEMONCOMP.RemoveMastersDemonsFromFight then
-                        DEMONCOMP.RemoveMastersDemonsFromFight(fight, ply)
-                    end
-
-                    self:AnnounceMessage(ply:Name() .. " has escaped the fight!")
-                    ply:ChatPrint("You've successfully escaped the fight!")
-
-                    local playerSWEP = player:GetWeapon("smti_engageswep")
-                    if IsValid(playerSWEP) then
-                        playerSWEP.InCombat = false
-                        playerSWEP.Enemy = nil
-                        playerSWEP.Allies = {}
-                    end
-
-                    self:CheckForTeamDefeat(self.FightId)
-                    TBCWeaponMetatable:ClearFightId(player)
-
-                    net.Start("PlayEndFightMusic")
-                    net.WriteEntity(player)
-                    net.Send(player)
-                    break
+        for _, sideKey in ipairs({"Side1", "Side2"}) do -- Iterate over Side1 and Side2
+            if TBC_RemovePlayerFromSide(fight, sideKey, ply) then
+                -- The escapee's demon companions flee with them
+                if DEMONCOMP and DEMONCOMP.RemoveMastersDemonsFromFight then
+                    DEMONCOMP.RemoveMastersDemonsFromFight(fight, ply)
                 end
+
+                self:AnnounceMessage(ply:Name() .. " has escaped the fight!")
+                ply:ChatPrint("You've successfully escaped the fight!")
+
+                local playerSWEP = ply:GetWeapon("smti_engageswep")
+                if IsValid(playerSWEP) then
+                    playerSWEP.InCombat = false
+                    playerSWEP.Enemy = nil
+                    playerSWEP.Allies = {}
+                end
+
+                self:CheckForTeamDefeat(self.FightId)
+                TBCWeaponMetatable:ClearFightId(ply)
+
+                net.Start("PlayEndFightMusic")
+                net.WriteEntity(ply)
+                net.Send(ply)
+                break
             end
         end
     else
@@ -1317,8 +1426,42 @@ function TBCWeaponMetatable:CheckAFK()
     end
 end
 
+local function TBC_CheckEarthProtection(weapon, ply)
+    if not SERVER or not IsValid(ply) or ply.TBC_EarthProtectionUsedThisTurn then
+        return
+    end
+
+    local buffsTable = GetAllStats(ply, "buffs")
+    if not buffsTable["Earth_Protection"] then return end
+
+    ply.TBC_EarthProtectionUsedThisTurn = true
+
+    local fight = TBCWeaponMetatable.OngoingFights[weapon.FightId]
+    if not fight then return end
+
+    local side = table.HasValue(fight.Side1, ply) and fight.Side1 or
+                     (table.HasValue(fight.Side2, ply) and fight.Side2)
+    if not side then return end
+
+    for _, ally in ipairs(side) do
+        if IsValid(ally) then
+            local currentHP = ally:GetNWInt("TBCHP", 100)
+            if currentHP > 0 then
+                local maxHP = ally:GetNWInt("TBCMAXHP", 100)
+                ally:SetNWInt("TBCHP", math.min(currentHP + 15, maxHP))
+            end
+        end
+    end
+
+    weapon:AnnounceMessage(ply:Name() ..
+                                "'s Earth Protection heals the team for 15 HP!")
+end
+
 function TBCWeaponMetatable:EndAbility()
     local ply = self.Owner
+
+    TBC_CheckEarthProtection(self, ply)
+
     local timerName = "TurnEndTimer_" .. ply:UserID()
 
     -- Check if the timer already exists before creating a new one in case of AoE rolling
@@ -1337,8 +1480,7 @@ function TBCWeaponMetatable:EndAbility()
 
                 local hasOneMore = buffsTable["One_More"] ~= nil
 
-                -- If the player is acting through a demon companion, One More
-                -- lands on the demon instead - honor it as well
+                -- If the player is acting through a demon companion, One More lands on the demon instead
                 if not hasOneMore and IsValid(ply.TBCControlledDemon) then
                     local demonBuffs = GetAllStats(ply.TBCControlledDemon, "buffs")
                     hasOneMore = demonBuffs["One_More"] ~= nil
@@ -1372,14 +1514,11 @@ hook.Add(
 
         victim:ChatPrint("You have lost the battle.")
 
-        -- Remove the deceased player from their side
-        local sides = {fight.Side1, fight.Side2} -- Create a table containing Side1 and Side2
-        for _, players in ipairs(sides) do -- Iterate over Side1 and Side2
-            for i, player in ipairs(players) do
-                if player == victim then
-                    table.remove(players, i)
-                    break
-                end
+        -- Remove the deceased player from their side and keep the turn
+        -- pointer aligned so the next NextTurn() lands on an alive member
+        for _, sideKey in ipairs({"Side1", "Side2"}) do
+            if TBC_RemovePlayerFromSide(fight, sideKey, victim) then
+                break
             end
         end
 
@@ -1413,14 +1552,11 @@ hook.Add(
             return
         end -- Exit if the fight does not exist
 
-        -- Remove the disconnecting player from their side
-        local sides = {fight.Side1, fight.Side2}
-        for _, players in ipairs(sides) do
-            for i, player in ipairs(players) do
-                if player == leavingPlayer then
-                    table.remove(players, i)
-                    break
-                end
+        -- Remove the disconnecting player from their side and keep the turn
+        -- pointer aligned so the next NextTurn() lands on an alive member
+        for _, sideKey in ipairs({"Side1", "Side2"}) do
+            if TBC_RemovePlayerFromSide(fight, sideKey, leavingPlayer) then
+                break
             end
         end
 
