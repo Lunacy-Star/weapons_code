@@ -52,6 +52,7 @@ SWEP.SlotType = "Equipment"
 SWEP.Rarity = "Exclusive"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.FallsBackToSelf = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -61,7 +62,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -70,8 +71,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -96,8 +97,8 @@ function SWEP:PrimaryAttack()
     self.Owner:ViewPunch(Angle(-1.5, 0, 0))
     self.BaseClass.ShootEffects(self)
 
-    if tr.Hit and CheckIfValidTBCEntity(tr.Entity) then
-        local target = tr.Entity
+    if true then
+        local target = (tr.Hit and CheckIfValidTBCEntity(tr.Entity)) and tr.Entity or ply
         local dmg = DamageInfo()
         dmg:SetDamage(0)
         dmg:SetAttacker(ply)
@@ -116,6 +117,9 @@ function SWEP:PrimaryAttack()
             end
 
             self:AnnounceAbility()
+            if not IsValid(self) or not IsValid(ply) or not TBCWeaponMetatable.OngoingFights[self.FightId] then return end
+            timer.Simple(TBC_CAST_DELAY, function()
+                if SMTParticles then SMTParticles.TriggerForWeapon(self, target) end
 
             local userBuffsTable = GetAllStats(ply, "buffs")
             local userDebuffsTable = GetAllStats(ply, "debuffs")
@@ -244,168 +248,10 @@ function SWEP:PrimaryAttack()
             end
 
             self:EndAbility()
+            end)
         end
     end
 
     ply:LagCompensation(false)
 end --
 
-function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 1)
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    self:ShootEffects()
-    self:EmitSound(ShootSound)
-    self.Owner:ViewPunch(Angle(-1.5, 0, 0))
-    self.BaseClass.ShootEffects(self)
-
-    local target = ply
-    local dmg = DamageInfo()
-    dmg:SetDamage(0)
-    dmg:SetAttacker(ply)
-    dmg:SetInflictor(self)
-    dmg:SetDamageForce(ply:GetAimVector())
-    dmg:SetDamagePosition(target:GetPos())
-    dmg:SetDamageType(DMG_CLUB)
-    target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                               ShootEnd)
-
-    if SERVER and IsValid(target) then
-        if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or
-            not TargetCheckValidity(ply, target, true) then
-            ply:LagCompensation(false)
-            return
-        end
-
-        self:AnnounceAbility()
-
-        local userBuffsTable = GetAllStats(ply, "buffs")
-        local userDebuffsTable = GetAllStats(ply, "debuffs")
-
-        local targetEffects = {}
-
-        targetEffects["userBuffsTable"] = userBuffsTable
-        targetEffects["userDebuffsTable"] = userDebuffsTable
-
-        local status = HandleStatus(ply, targetEffects["userDebuffsTable"],
-                                    "canUseSkills", true, targetEffects)
-
-        if not status then
-            ply:LagCompensation(false)
-            return
-        end
-
-        local mpCost = self.MPCost -- MP cost of the attack
-        local attackerMP = ply:GetNWInt("TBCMP", 100)
-
-        mpCost = mpCost +
-                     (HandleStatus(ply, userDebuffsTable, "increaseMPCost",
-                                   mpCost) -
-                         HandleStatus(ply, userBuffsTable, "decreaseMPCost",
-                                      mpCost))
-
-        if attackerMP >= mpCost then
-            ply:SetNWInt("TBCMP", attackerMP - mpCost)
-        else
-            ply:ChatPrint("Not enough MP to use this ability.")
-            ply:LagCompensation(false)
-            return
-        end
-
-        targetEffects["targetDebuffsTable"] = GetAllStats(target, "debuffs")
-
-        local playerStr = tonumber(ply:GetNWInt("TBCSTR", 0))
-        local playerChr = tonumber(ply:GetNWInt("TBCCHR", 0))
-        local playerDex = tonumber(ply:GetNWInt("TBCDEX", 0))
-
-        if playerStr >= 4 then
-            if targetEffects["targetDebuffsTable"]["Tarunda"] then
-                targetEffects["targetDebuffsTable"]["Tarunda"].stacks =
-                    math.min(targetEffects["targetDebuffsTable"]["Tarunda"]
-                                 .stacks + 1, 4)
-            else
-                targetEffects["targetDebuffsTable"]["Tarunda"] = {stacks = 1}
-            end
-
-            local message = target:Name() .. " received Tarunda from " ..
-                                ply:Name() .. "! They now have " ..
-                                targetEffects["targetDebuffsTable"]["Tarunda"]
-                                    .stacks .. " stacks!"
-
-            AssignStat(target, "Tarunda",
-                       targetEffects["targetDebuffsTable"]["Tarunda"], "debuffs")
-
-            targetEffects["debuff"] = "Tarunda"
-
-            HandleStatus(target, GetAllStats(target, "buffs"), "reactionDebuff",
-                         "debuff", targetEffects)
-
-            self:AnnounceMessage(message)
-        end
-
-        if playerDex >= 4 then
-            if targetEffects["targetDebuffsTable"]["Sukunda"] then
-                targetEffects["targetDebuffsTable"]["Sukunda"].stacks =
-                    math.min(targetEffects["targetDebuffsTable"]["Sukunda"]
-                                 .stacks + 1, 4)
-            else
-                targetEffects["targetDebuffsTable"]["Sukunda"] = {stacks = 1}
-            end
-
-            local message = target:Name() .. " received Sukunda from " ..
-                                ply:Name() .. "! They now have " ..
-                                targetEffects["targetDebuffsTable"]["Sukunda"]
-                                    .stacks .. " stacks!"
-
-            AssignStat(target, "Sukunda",
-                       targetEffects["targetDebuffsTable"]["Sukunda"], "debuffs")
-
-            self:AnnounceMessage(message)
-        end
-
-        if playerChr >= 4 then
-            if targetEffects["targetDebuffsTable"]["Rakunda"] then
-                targetEffects["targetDebuffsTable"]["Rakunda"].stacks =
-                    math.min(targetEffects["targetDebuffsTable"]["Rakunda"]
-                                 .stacks + 1, 4)
-            else
-                targetEffects["targetDebuffsTable"]["Rakunda"] = {stacks = 1}
-            end
-
-            local message = target:Name() .. " received Rakunda from " ..
-                                ply:Name() .. "! They now have " ..
-                                targetEffects["targetDebuffsTable"]["Rakunda"]
-                                    .stacks .. " stacks!"
-
-            AssignStat(target, "Rakunda",
-                       targetEffects["targetDebuffsTable"]["Rakunda"], "debuffs")
-
-            targetEffects["debuff"] = "Rakunda"
-
-            HandleStatus(target, GetAllStats(target, "buffs"), "reactionDebuff",
-                         "debuff", targetEffects)
-
-            self:AnnounceMessage(message)
-        end
-
-        if playerStr < 4 and playerDex < 4 and playerChr < 4 then
-            ply:EmitSound("SMTImagine_WeaponsPack/fart.wav", 75, 100, 1,
-                          CHAN_AUTO)
-            local message = "But nothing happened..."
-            self:AnnounceMessage(message)
-        end
-
-        self:EndAbility()
-    end
-
-    ply:LagCompensation(false)
-end --

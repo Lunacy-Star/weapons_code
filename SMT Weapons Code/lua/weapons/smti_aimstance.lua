@@ -53,6 +53,7 @@ SWEP.SlotsTaking = 1
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.PrimarySelfOnly = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -62,7 +63,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -71,8 +72,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     if ply:IsPlayer() then
         local target = ply
@@ -107,6 +108,9 @@ function SWEP:PrimaryAttack()
             end
 
             self:AnnounceAbility()
+            if not IsValid(self) or not IsValid(ply) or not TBCWeaponMetatable.OngoingFights[self.FightId] then return end
+            timer.Simple(TBC_CAST_DELAY, function()
+                if SMTParticles then SMTParticles.TriggerForWeapon(self, target) end
 
             local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
             if fight then
@@ -160,6 +164,7 @@ function SWEP:PrimaryAttack()
             self:AnnounceMessage(message)
 
             self:EndAbility()
+            end)
         end
     end
 

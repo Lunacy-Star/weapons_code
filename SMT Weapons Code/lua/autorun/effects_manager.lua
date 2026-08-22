@@ -234,10 +234,6 @@ function TargetCheckValidity(ply, target, hpValidation)
             return false
         end
 
-        if SMTParticles then
-            SMTParticles.TriggerForWeapon(ply:GetActiveWeapon(), target)
-        end
-
         return true
     end
 
@@ -266,10 +262,6 @@ function TargetCheckValidity(ply, target, hpValidation)
         local message = "You can't do this while you're dead."
         ply:ChatPrint(message)
         return false
-    end
-
-    if SMTParticles then
-        SMTParticles.TriggerForWeapon(ply:GetActiveWeapon(), target)
     end
 
     return true
@@ -319,10 +311,6 @@ function HealCheckValidity(ply, target)
         resultsArray["inAFight"] = inAFight
         resultsArray["validated"] = true
 
-        if SMTParticles then
-            SMTParticles.TriggerForWeapon(ply:GetActiveWeapon(), target)
-        end
-
         return resultsArray
     end
 
@@ -339,10 +327,6 @@ function HealCheckValidity(ply, target)
 
     resultsArray["inAFight"] = inAFight
     resultsArray["validated"] = true
-
-    if SMTParticles then
-        SMTParticles.TriggerForWeapon(ply:GetActiveWeapon(), target)
-    end
 
     return resultsArray
 end

@@ -608,7 +608,8 @@ Personas = {
         repel = {},
         skills = {
             "smti_mabufu_persona", "smti_lourdes_persona",
-            "smti_sonicpunch_persona", "smti_jackbufula_persona"
+            "smti_sonicpunch_persona", "smti_jackbufula_persona",
+            "smti_icerush", "smti_physrush"
         },
         passives = {},
         description = "An elf-like creature who is the embodiment of all that is cool. It is said that he is the one who leaves those beautiful icy patterns on windows in the morning.",
@@ -627,7 +628,7 @@ Personas = {
         repel = {},
         skills = {
             "smti_zionga_persona", "smti_diarama_persona", "smti_patra_persona",
-            "smti_fairyring_persona"
+            "smti_fairyring_persona", "smti_elecrush", "smti_ruinrush"
         },
         passives = {},
         description = "A small fairy found in southwestern Britain known for their cheerful nature and love of pranks. Their physical appearance changes from region to region, but their personality is always playful and mischievous. A common prank they like to pull is causing humans to wander in circles. However, they are also known to help farmers from time to time and are generally considered good fairies.",
@@ -646,7 +647,7 @@ Personas = {
         repel = {"Fire"},
         skills = {
             "smti_tarunda_persona", "smti_agilao_persona",
-            "smti_spiralember_persona"
+            "smti_spiralember_persona", "smti_firerush", "smti_ruinrush"
         },
         passives = {
             Fire_Boost = {
@@ -672,7 +673,8 @@ Personas = {
         repel = {"Wind"},
         skills = {
             "smti_teardrop_persona", "smti_forcewall_persona",
-            "smti_mazan_persona", "smti_zanma_persona"
+            "smti_mazan_persona", "smti_zanma_persona",
+            "smti_forcerush", "smti_gunfirerush"
         },
         passives = {},
         description = "A spirit of rivers and mountains in Japanese lore, they dwell in ancient trees and ageless rocks. They are not evil, and will often appear as humans or supernatural wonders to warn people.",
@@ -691,7 +693,8 @@ Personas = {
         repel = {},
         skills = {
             "smti_tarukaja_persona", "smti_agi_persona",
-            "smti_dreamneedle_persona", "smti_giantslice_persona"
+            "smti_dreamneedle_persona", "smti_giantslice_persona",
+            "smti_firerush", "smti_physrush"
         },
         passives = {},
         description = "A dog spirit said to possess people in Japanese lore. Those possessed are in a state of \"inu-tsuki\" and lose consciousness. Onmyoji use Inugami as familiars.",
@@ -813,7 +816,8 @@ Personas = {
         repel = {},
         skills = {
             "smti_lunge_persona", "smti_demonicgaze_persona",
-            "smti_maeiha_persona", "smti_corrosivefluid_persona"
+            "smti_maeiha_persona", "smti_corrosivefluid_persona",
+            "smti_darkrush", "smti_physrush"
         },
         passives = {},
         description = "A primitive monster with a viscous body. There are various theories as to its origin, but it is still under debate. Said to compulsively collect shiny objects.",
@@ -832,7 +836,7 @@ Personas = {
         repel = {},
         skills = {
             "smti_provoke_persona", "smti_lifedrain_persona",
-            "smti_poisonbreath_persona"
+            "smti_poisonbreath_persona", "smti_darkrush", "smti_physrush"
         },
         passives = {
             Life_Bonus = {
@@ -959,7 +963,8 @@ Personas = {
         repel = {},
         skills = {
             "smti_bufula_persona", "smti_spiritdrain_persona",
-            "smti_dormina_standard_persona", "smti_dekaja_persona"
+            "smti_dormina_standard_persona", "smti_dekaja_persona",
+            "smti_darkrush", "smti_quickspiritdrain"
         },
         passives = {},
         description = "Originating in European folklore, the Succubus is the female counterpart to the Incubus. They visit men in their dreams sucking the life force out of them. The victims remain asleep but may dream of the encounters.",
@@ -978,7 +983,8 @@ Personas = {
         repel = {},
         skills = {
             "smti_mudoon_persona", "smti_berserk_persona",
-            "smti_discord_persona", "smti_dekaja_persona"
+            "smti_discord_persona", "smti_dekaja_persona",
+            "smti_darkrush", "smti_quicklifedrain"
         },
         passives = {},
         description = "A creature of folklore from Dominica. It is a living skull that gives out a piercing laugh. It is said that the hearts of those who hear its laugh will immediately stop.",
@@ -997,7 +1003,7 @@ Personas = {
         repel = {},
         skills = {
             "smti_herculeanstrike_persona", "smti_giantslice_standard_persona",
-            "smti_powercharge_persona"
+            "smti_powercharge_persona", "smti_physrush", "smti_quicktarukaja"
         },
         passives = {
             Counter = {
@@ -1023,7 +1029,7 @@ Personas = {
         repel = {},
         skills = {
             "smti_hama_persona", "smti_patra_persona", "smti_diarama_persona",
-            "smti_recarm_persona"
+            "smti_recarm_persona", "smti_lightrush", "smti_forcerush"
         },
         passives = {},
         description = "Ninth of the nine orders of angels. They are closest in nature to humans. They watch over individuals and offer warning to those who stray from the path.",

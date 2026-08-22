@@ -1,9 +1,9 @@
 AddCSLuaFile("shared.lua")
 AddCSLuaFile("cl_init.lua")
-AddCSLuaFile("cl_dialogue_ui.lua")
-AddCSLuaFile("cl_storage_ui.lua")
-AddCSLuaFile("cl_adminstorage.lua")
-AddCSLuaFile("cl_shop_ui.lua")
+AddCSLuaFile("autorun/client/cl_dialogue_ui.lua")
+AddCSLuaFile("autorun/client/cl_storage_ui.lua")
+AddCSLuaFile("autorun/client/cl_adminstorage.lua")
+AddCSLuaFile("autorun/client/cl_shop_ui.lua")
 include("shared.lua")
 
 util.AddNetworkString("DialogueOpen")

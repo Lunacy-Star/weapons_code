@@ -51,6 +51,7 @@ SWEP.SlotsTaking = 0
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.FallsBackToSelf = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -60,7 +61,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -69,8 +70,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -95,8 +96,8 @@ function SWEP:PrimaryAttack()
     self.Owner:ViewPunch(Angle(-1.5, 0, 0))
     self.BaseClass.ShootEffects(self)
 
-    if tr.Hit and CheckIfValidTBCEntity(tr.Entity) then
-        local target = tr.Entity
+    if true then
+        local target = (tr.Hit and CheckIfValidTBCEntity(tr.Entity)) and tr.Entity or ply
         local dmg = DamageInfo()
         dmg:SetDamage(0)
         dmg:SetAttacker(ply)
@@ -116,39 +117,3 @@ function SWEP:PrimaryAttack()
     ply:LagCompensation(false)
 end --
 
-function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 1)
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    self:ShootEffects()
-    self:EmitSound(ShootSound)
-    self.Owner:ViewPunch(Angle(-1.5, 0, 0))
-    self.BaseClass.ShootEffects(self)
-
-    local target = ply
-    local dmg = DamageInfo()
-    dmg:SetDamage(0)
-    dmg:SetAttacker(ply)
-    dmg:SetInflictor(self)
-    dmg:SetDamageForce(ply:GetAimVector())
-    dmg:SetDamagePosition(target:GetPos())
-    dmg:SetDamageType(DMG_CLUB)
-    target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                               ShootEnd)
-
-    if SERVER and IsValid(target) then
-        HandleSkill(ply, target, self.PrintName:gsub("%s+", "_")
-                        :gsub("[%(%)]", ""):gsub("-", "_") .. "_S")
-    end
-
-    ply:LagCompensation(false)
-end --

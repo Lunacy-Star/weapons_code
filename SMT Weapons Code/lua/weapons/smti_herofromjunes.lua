@@ -49,6 +49,7 @@ SWEP.SlotsTaking = 0
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.FallsBackToSelf = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -58,7 +59,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -67,8 +68,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -93,8 +94,8 @@ function SWEP:PrimaryAttack()
     self.Owner:ViewPunch(Angle(-1.5, 0, 0))
     self.BaseClass.ShootEffects(self)
 
-    if tr.Hit and CheckIfValidTBCEntity(tr.Entity) then
-        local target = tr.Entity
+    if true then
+        local target = (tr.Hit and CheckIfValidTBCEntity(tr.Entity)) and tr.Entity or ply
         local dmg = DamageInfo()
         dmg:SetDamage(0)
         dmg:SetAttacker(ply)
@@ -127,6 +128,9 @@ function SWEP:PrimaryAttack()
             end
 
             self:AnnounceAbility()
+            if not IsValid(self) or not IsValid(ply) or not TBCWeaponMetatable.OngoingFights[self.FightId] then return end
+            timer.Simple(TBC_CAST_DELAY, function()
+                if SMTParticles then SMTParticles.TriggerForWeapon(self, target) end
 
             local targetBuffsTable = GetAllStats(target, "buffs")
 
@@ -161,90 +165,10 @@ function SWEP:PrimaryAttack()
                          targetEffects)
 
             self:EndAbility()
+            end)
         end
     end
 
     ply:LagCompensation(false)
 end --
 
-function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 1)
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    self:ShootEffects()
-    self:EmitSound(ShootSound)
-    self.Owner:ViewPunch(Angle(-1.5, 0, 0))
-    self.BaseClass.ShootEffects(self)
-
-    local target = ply
-    local dmg = DamageInfo()
-    dmg:SetDamage(0)
-    dmg:SetAttacker(ply)
-    dmg:SetInflictor(self)
-    dmg:SetDamageForce(ply:GetAimVector())
-    dmg:SetDamagePosition(target:GetPos())
-    dmg:SetDamageType(DMG_CLUB)
-    target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                               ShootEnd)
-
-    if SERVER and IsValid(target) then
-        if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or
-            not TargetCheckValidity(ply, target, true) then
-            ply:LagCompensation(false)
-            return
-        end
-
-        local userBuffsTable = GetAllStats(ply, "buffs")
-        local userDebuffsTable = GetAllStats(ply, "debuffs")
-
-        local targetEffects = {}
-
-        targetEffects["userBuffsTable"] = userBuffsTable
-        targetEffects["userDebuffsTable"] = userDebuffsTable
-
-        if not targetEffects["userBuffsTable"]["One_More"] then
-            ply:ChatPrint("You cannot use Combat Tactics without One More.")
-            ply:LagCompensation(false)
-            return
-        end
-
-        local targetBuffsTable = GetAllStats(target, "buffs")
-
-        if targetBuffsTable["Sukukaja"] then
-            targetBuffsTable["Sukukaja"].stacks = math.min(
-                                                      targetBuffsTable["Sukukaja"]
-                                                          .stacks + 1, 4)
-        else
-            targetBuffsTable["Sukukaja"] = {stacks = 1}
-        end
-
-        AssignStat(target, "Sukukaja", targetBuffsTable["Sukukaja"], "buffs")
-
-        local message = target:Name() .. " received " .. self.PrintName ..
-                            "! They now have " ..
-                            targetBuffsTable["Sukukaja"].stacks .. " stacks!"
-
-        RemoveStat(ply, "One_More", "buffs")
-        HandleStatus(ply, userBuffsTable, "comtacReaction", false, targetEffects)
-
-        targetEffects["buff"] = "Sukukaja"
-
-        HandleStatus(target, targetBuffsTable, "reactionBuff", "buff",
-                     targetEffects)
-
-        self:AnnounceMessage(message)
-
-        self:EndAbility()
-    end
-
-    ply:LagCompensation(false)
-end --

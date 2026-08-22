@@ -51,6 +51,7 @@ SWEP.SlotsTaking = 1
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.PrimarySelfOnly = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -60,7 +61,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -97,6 +98,9 @@ function SWEP:PrimaryAttack()
         end
 
         self:AnnounceAbility()
+        if not IsValid(self) or not IsValid(ply) or not TBCWeaponMetatable.OngoingFights[self.FightId] then return end
+        timer.Simple(TBC_CAST_DELAY, function()
+            if SMTParticles then SMTParticles.TriggerForWeapon(self, target) end
 
         userBuffsTable["Mind_Charge_Boss"] = {stacks = 1}
 
@@ -107,6 +111,7 @@ function SWEP:PrimaryAttack()
                                  " charges power into their next magical attack!")
 
         self:EndAbility()
+        end)
     end
 
     ply:LagCompensation(false)

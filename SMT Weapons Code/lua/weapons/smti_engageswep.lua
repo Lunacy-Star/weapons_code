@@ -50,7 +50,7 @@ end
 
 function SWEP:PrimaryAttack()
 
-    self:SetNextPrimaryFire(CurTime() + 1) -- Adjust cooldown as necessary
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY) -- Adjust cooldown as necessary
 
     if CLIENT then return end
 
@@ -72,8 +72,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250 -- Adjust range as necessary
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,

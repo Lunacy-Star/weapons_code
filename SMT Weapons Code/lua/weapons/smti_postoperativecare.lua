@@ -51,6 +51,7 @@ SWEP.SlotsTaking = 0
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.FallsBackToSelf = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -62,7 +63,7 @@ function SWEP:Initialize() self.CanUseAbility = true end
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -71,8 +72,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -97,8 +98,8 @@ function SWEP:PrimaryAttack()
     self.Owner:ViewPunch(Angle(-1.5, 0, 0))
     self.BaseClass.ShootEffects(self)
 
-    if tr.Hit and CheckIfValidTBCEntity(tr.Entity) then
-        local target = tr.Entity
+    if true then
+        local target = (tr.Hit and CheckIfValidTBCEntity(tr.Entity)) and tr.Entity or ply
         local dmg = DamageInfo()
         dmg:SetDamage(0)
         dmg:SetAttacker(ply)
@@ -239,152 +240,3 @@ function SWEP:PrimaryAttack()
     ply:LagCompensation(false)
 end --
 
-function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 1)
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    self:ShootEffects()
-    self:EmitSound(ShootSound)
-    self.Owner:ViewPunch(Angle(-1.5, 0, 0))
-    self.BaseClass.ShootEffects(self)
-
-    local target = ply
-    local dmg = DamageInfo()
-    dmg:SetDamage(0)
-    dmg:SetAttacker(ply)
-    dmg:SetInflictor(self)
-    dmg:SetDamageForce(ply:GetAimVector())
-    dmg:SetDamagePosition(target:GetPos())
-    dmg:SetDamageType(DMG_CLUB)
-    target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                               ShootEnd)
-
-    if SERVER and IsValid(target) then
-        if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or
-            not TargetCheckValidity(ply, target, true) then
-            ply:LagCompensation(false)
-            return
-        end
-
-        local currentHP = target:GetNWInt("TBCHP", 100)
-        local maxHP = target:GetNWInt("TBCMAXHP", 100)
-
-        if currentHP <= 0 then
-            local message = "You can't use this on a target that's dead."
-            ply:ChatPrint(message)
-            ply:LagCompensation(false)
-            return
-        end
-
-        local userBuffsTable = GetAllStats(ply, "buffs")
-        local userDebuffsTable = GetAllStats(ply, "debuffs")
-        local targetBuffsTable = GetAllStats(target, "buffs")
-        local targetDebuffsTable = GetAllStats(target, "debuffs")
-
-        local targetEffects = {}
-
-        targetEffects["userBuffsTable"] = userBuffsTable
-        targetEffects["userDebuffsTable"] = userDebuffsTable
-
-        if targetBuffsTable["Rakukaja"] then
-            targetBuffsTable["Rakukaja"].stacks = math.min(
-                                                      targetBuffsTable["Rakukaja"]
-                                                          .stacks + 1, 4)
-        else
-            targetBuffsTable["Rakukaja"] = {stacks = 1}
-        end
-
-        AssignStat(target, "Rakukaja", targetBuffsTable["Rakukaja"], "buffs")
-
-        local message = target:Name() .. " received Rakukaja! They now have " ..
-                            targetBuffsTable["Rakukaja"].stacks .. " stacks!"
-        self:AnnounceMessage(message)
-
-        targetEffects["ply"] = ply
-        targetEffects["target"] = target
-
-        HandleStatus(ply, targetEffects["userBuffsTable"], "reactionBuff",
-                     "buff", targetEffects)
-
-        if currentHP <= (maxHP * 0.5) then
-            local plyHP = ply:GetNWInt("TBCMAXHP", 100)
-
-            targetEffects["percentHeal"] = 0.1
-
-            targetEffects["ply"] = ply
-            targetEffects["target"] = target
-
-            targetEffects["baseDamage"] = plyHP * targetEffects["percentHeal"]
-
-            targetEffects["ply"] = ply
-            targetEffects["target"] = target
-
-            targetEffects["userBuffsTable"] = userBuffsTable
-            targetEffects["userDebuffsTable"] = userDebuffsTable
-            targetEffects["targetBuffsTable"] = targetBuffsTable
-            targetEffects["targetDebuffsTable"] = targetDebuffsTable
-
-            targetEffects["baseDamage"] =
-                targetEffects["baseDamage"] * (1 +
-                    ((HandleStatus(ply, userBuffsTable, "increaseHeal",
-                                   targetEffects["baseDamage"], targetEffects) -
-                        HandleStatus(ply, userDebuffsTable, "decreaseHeal",
-                                     targetEffects["baseDamage"], targetEffects)) +
-                        (HandleStatus(target, targetBuffsTable,
-                                      "increaseHealReceive",
-                                      targetEffects["baseDamage"]) -
-                            HandleStatus(target, targetDebuffsTable,
-                                         "decreaseHealReceive",
-                                         targetEffects["baseDamage"]))))
-
-            targetEffects["baseDamage"] =
-                targetEffects["baseDamage"] +
-                    (((HandleStatus(ply, userBuffsTable, "flatIncreaseHeal",
-                                    targetEffects["baseDamage"]) -
-                        HandleStatus(ply, userDebuffsTable, "flatDecreaseHeal",
-                                     targetEffects["baseDamage"])) +
-                        (HandleStatus(target, targetBuffsTable,
-                                      "flatIncreaseHealReceive",
-                                      targetEffects["baseDamage"]) -
-                            HandleStatus(target, targetDebuffsTable,
-                                         "flatDecreaseHealReceive",
-                                         targetEffects["baseDamage"]))))
-
-            targetEffects["baseDamage"] = math.ceil(targetEffects["baseDamage"])
-
-            HandleHealingEffects(ply, target, targetEffects)
-
-            local newHP = math.min(currentHP + targetEffects["baseDamage"],
-                                   maxHP)
-
-            target:SetNWInt("TBCHP", newHP)
-
-            local message = target:Name() .. " received " ..
-                                targetEffects["baseDamage"] .. " healing from " ..
-                                ply:Name() .. "!"
-            self:AnnounceMessage(message)
-
-            targetEffects["ply"] = ply
-            targetEffects["target"] = target
-
-            HandleStatus(ply, targetEffects["userBuffsTable"], "reactionBuff",
-                         "buff", targetEffects)
-        end
-
-        RemoveStat(ply, "One_More", "buffs")
-        HandleStatus(ply, userBuffsTable, "comtacReaction", false, targetEffects)
-
-        self:EndAbility()
-    end
-
-    ply:LagCompensation(false)
-end --

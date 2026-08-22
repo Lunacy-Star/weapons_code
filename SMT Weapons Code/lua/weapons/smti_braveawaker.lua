@@ -34,6 +34,7 @@ SWEP.SlotsTaking = 1
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.FallsBackToSelf = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -43,7 +44,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 function SWEP:Initialize() self:SetHoldType("melee") end
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -52,8 +53,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -83,8 +84,8 @@ function SWEP:PrimaryAttack()
         self:EmitSound("Weapon_Crowbar.Single")
     end
 
-    if tr.Hit and CheckIfValidTBCEntity(tr.Entity) then
-        local target = tr.Entity
+    if true then
+        local target = (tr.Hit and CheckIfValidTBCEntity(tr.Entity)) and tr.Entity or ply
         local dmg = DamageInfo()
         dmg:SetDamage(0)
         dmg:SetAttacker(ply)
@@ -103,78 +104,3 @@ function SWEP:PrimaryAttack()
 
     ply:LagCompensation(false)end --
 
-function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 1)
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    local tr = util.TraceHull({
-        start = ShootPos,
-        endpos = ShootEnd,
-        filter = ply,
-        mask = MASK_SHOT_HULL,
-        mins = tmin,
-        maxs = tmax
-    })
-
-    if not IsValid(tr.Entity) then
-        tr = util.TraceLine({
-            start = ShootPos,
-            endpos = ShootEnd,
-            filter = ply,
-            mask = MASK_SHOT_HULL
-        })
-    end
-
-    if tr.Hit then
-        self:SendWeaponAnim(ACT_VM_HITCENTER)
-        ply:SetAnimation(PLAYER_ATTACK1)
-        self:EmitSound("Weapon_Crowbar.Melee_Hit")
-    else
-        self:SendWeaponAnim(ACT_VM_MISSCENTER)
-        ply:SetAnimation(PLAYER_ATTACK1)
-        self:EmitSound("Weapon_Crowbar.Single")
-    end
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    self:ShootEffects()
-    self:EmitSound(ShootSound)
-    self.Owner:ViewPunch(Angle(-1.5, 0, 0))
-    self.BaseClass.ShootEffects(self)
-
-    local target = ply
-    if tr.Hit then target = tr.Entity end
-
-    local dmg = DamageInfo()
-    dmg:SetDamage(0)
-    dmg:SetAttacker(ply)
-    dmg:SetInflictor(self)
-    dmg:SetDamageForce(ply:GetAimVector())
-    dmg:SetDamagePosition(target:GetPos())
-    dmg:SetDamageType(DMG_CLUB)
-    target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                               ShootEnd)
-
-    if SERVER and IsValid(target) then
-        HandleSkill(ply, target, self.PrintName:gsub("%s+", "_")
-                        :gsub("[%(%)]", ""):gsub("-", "_") .. "_S")
-    end
-
-    ply:LagCompensation(false)end -- 

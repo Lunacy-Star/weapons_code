@@ -51,6 +51,7 @@ SWEP.SlotsTaking = 0
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.FallsBackToSelf = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -60,7 +61,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -69,8 +70,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -95,8 +96,8 @@ function SWEP:PrimaryAttack()
     self.Owner:ViewPunch(Angle(-1.5, 0, 0))
     self.BaseClass.ShootEffects(self)
 
-    if tr.Hit then
-        local target = tr.Entity
+    if true then
+        local target = (tr.Hit) and tr.Entity or ply
         local dmg = DamageInfo()
         dmg:SetDamage(0)
         dmg:SetAttacker(ply)
@@ -116,6 +117,9 @@ function SWEP:PrimaryAttack()
             end
 
             self:AnnounceAbility()
+            if not IsValid(self) or not IsValid(ply) or not TBCWeaponMetatable.OngoingFights[self.FightId] then return end
+            timer.Simple(TBC_CAST_DELAY, function()
+                if SMTParticles then SMTParticles.TriggerForWeapon(self, target) end
 
             local targetEffects = {}
 
@@ -289,223 +293,10 @@ function SWEP:PrimaryAttack()
 
             self:EndAbility()
 
+            end)
         end
     end
 
     ply:LagCompensation(false)
 end --
 
-function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 1)
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    self:ShootEffects()
-    self:EmitSound(ShootSound)
-    self.Owner:ViewPunch(Angle(-1.5, 0, 0))
-    self.BaseClass.ShootEffects(self)
-
-    if ply:IsPlayer() then
-        local target = ply
-        local dmg = DamageInfo()
-        dmg:SetDamage(0)
-        dmg:SetAttacker(ply)
-        dmg:SetInflictor(self)
-        dmg:SetDamageForce(ply:GetAimVector())
-        dmg:SetDamagePosition(target:GetPos())
-        dmg:SetDamageType(DMG_CLUB)
-        target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                                   ShootEnd)
-
-        if SERVER and IsValid(target) then
-            if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or
-                not TargetCheckValidity(ply, target, true) then
-                ply:LagCompensation(false)
-                return
-            end
-
-            self:AnnounceAbility()
-
-            local targetEffects = {}
-
-            local userBuffsTable = GetAllStats(ply, "buffs")
-            local userDebuffsTable = GetAllStats(ply, "debuffs")
-
-            targetEffects["userBuffsTable"] = userBuffsTable
-            targetEffects["userDebuffsTable"] = userDebuffsTable
-
-            if not targetEffects["userBuffsTable"]["One_More"] then
-                ply:ChatPrint("You cannot use Combat Tactics without One More.")
-                ply:LagCompensation(false)
-                return
-            end
-
-            local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
-            if fight then
-            else
-                return
-            end
-
-            local debuffsToRemove = Ailments_Statuses["Ailments"]
-
-            local debuffsTable = GetAllStats(target, "debuffs")
-            local debuffsRemoved = 0
-            for _, debuffName in ipairs(debuffsToRemove) do
-                if debuffsTable[debuffName] then
-                    RemoveStat(target, debuffName, "debuffs")
-                    debuffsTable[debuffName] = nil
-                    debuffsRemoved = debuffsRemoved + 1
-                end
-            end
-
-            local message = target:Name() .. " had their ailments cured by " ..
-                                ply:Name() .. "!"
-
-            self:AnnounceMessage(message)
-
-            if debuffsRemoved > 0 then
-                local playerSide = (table.HasValue(fight.Side1, target) and
-                                       "Side1") or
-                                       (table.HasValue(fight.Side2, target) and
-                                           "Side2")
-
-                local opforSide = (playerSide == "Side1") and "Side2" or "Side1"
-
-                local playersInFight = {}
-                for _, player in ipairs(fight[opforSide]) do
-                    if IsValid(player) then
-                        table.insert(playersInFight, player)
-                    end
-                end
-
-                for _, player in ipairs(playersInFight) do
-                    if TargetCheckValidity(ply, player) then -- Check if the player is valid
-                        local targetBuffsTable = GetAllStats(player, "buffs")
-                        local targetDebuffsTable =
-                            GetAllStats(player, "debuffs")
-
-                        local targetEffects = {}
-                        targetEffects["baseDamage"] = self.DamageAmount *
-                                                          debuffsRemoved
-                        targetEffects["Affinity"] = self.Affinity
-
-                        targetEffects["ply"] = ply
-                        targetEffects["target"] = player
-
-                        targetEffects["userBuffsTable"] = userBuffsTable
-                        targetEffects["userDebuffsTable"] = userDebuffsTable
-                        targetEffects["targetBuffsTable"] = targetBuffsTable
-                        targetEffects["targetDebuffsTable"] = targetDebuffsTable
-
-                        targetEffects["state"] = 'normal'
-
-                        targetEffects = HandleRepel(targetEffects["ply"],
-                                                    targetEffects["target"],
-                                                    targetEffects)
-                        if targetEffects["state"] == 'repel' then
-                            self:AnnounceMessage(player:Name() ..
-                                                     " repeled the attack!")
-                        end
-                        targetEffects = HandleResistances(targetEffects["ply"],
-                                                          targetEffects["target"],
-                                                          targetEffects)
-                        targetEffects = HandleWeaknesses(targetEffects["ply"],
-                                                         targetEffects["target"],
-                                                         targetEffects)
-                        targetEffects = HandleBlock(targetEffects["ply"],
-                                                    targetEffects["target"],
-                                                    targetEffects)
-                        targetEffects = HandleDrain(targetEffects["ply"],
-                                                    targetEffects["target"],
-                                                    targetEffects)
-
-                        targetEffects["attacker"] = targetEffects["ply"]
-                        targetEffects["target"] = targetEffects["target"]
-
-                        targetEffects["baseDamage"] =
-                            targetEffects["baseDamage"] +
-                                (HandleStatus(targetEffects["ply"],
-                                              targetEffects["userBuffsTable"],
-                                              "damage",
-                                              targetEffects["baseDamage"],
-                                              targetEffects) -
-                                    HandleStatus(targetEffects["ply"],
-                                                 targetEffects["userDebuffsTable"],
-                                                 "decreaseDamage",
-                                                 targetEffects["baseDamage"],
-                                                 targetEffects)) -
-                                (HandleStatus(targetEffects["target"],
-                                              targetEffects["targetBuffsTable"],
-                                              "defenseDamage",
-                                              targetEffects["baseDamage"],
-                                              targetEffects) -
-                                    HandleStatus(targetEffects["target"],
-                                                 targetEffects["targetDebuffsTable"],
-                                                 "defenseDecrease",
-                                                 targetEffects["baseDamage"],
-                                                 targetEffects))
-
-                        targetEffects["baseDamage"] = math.ceil(
-                                                          targetEffects["baseDamage"])
-
-                        targetEffects = HandleDamageMessage(
-                                            targetEffects["ply"],
-                                            targetEffects["target"],
-                                            targetEffects)
-
-                        local currentHP =
-                            targetEffects["target"]:GetNWInt("TBCHP", 100)
-                        local maxHP = targetEffects["target"]:GetNWInt(
-                                          "TBCMAXHP", 100)
-                        local newHP
-
-                        if targetEffects["state"] == "drain" then
-                            newHP = math.min(currentHP +
-                                                 targetEffects["baseDamage"],
-                                             maxHP)
-                        else
-                            newHP = currentHP - targetEffects["baseDamage"]
-                            HandleStatus(targetEffects["target"], targetEffects,
-                                         "damageReaction", false, targetEffects)
-                        end
-
-                        targetEffects["target"]:SetNWInt("TBCHP", newHP)
-
-                        self:AnnounceMessage(targetEffects["message"])
-
-                        if newHP <= 0 then
-                            targetEffects["target"]:SetNWInt("TBCHP", 0)
-
-                            targetEffects["lifeState"] = "dead"
-                            targetEffects =
-                                HandleDeath(targetEffects["ply"],
-                                            targetEffects["target"],
-                                            targetEffects)
-                            targetEffects =
-                                HandleKill(targetEffects["ply"],
-                                           targetEffects["target"],
-                                           targetEffects)
-
-                            self:CheckForTeamDefeat(self.FightId)
-                        end
-                    end
-                end
-            end
-            RemoveStat(ply, "One_More", "buffs")
-            HandleStatus(ply, userBuffsTable, "comtacReaction", false,
-                         targetEffects)
-
-            self:EndAbility()
-        end
-    end
-
-    ply:LagCompensation(false)
-end --

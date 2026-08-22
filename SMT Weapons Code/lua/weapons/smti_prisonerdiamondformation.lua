@@ -51,6 +51,7 @@ SWEP.SlotsTaking = 1
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.FallsBackToSelf = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -60,7 +61,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -69,8 +70,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -95,8 +96,8 @@ function SWEP:PrimaryAttack()
     self.Owner:ViewPunch(Angle(-1.5, 0, 0))
     self.BaseClass.ShootEffects(self)
 
-    if tr.Hit and CheckIfValidTBCEntity(tr.Entity) then
-        local target = tr.Entity
+    if true then
+        local target = (tr.Hit and CheckIfValidTBCEntity(tr.Entity)) and tr.Entity or ply
         local dmg = DamageInfo()
         dmg:SetDamage(0)
         dmg:SetAttacker(ply)
@@ -115,6 +116,9 @@ function SWEP:PrimaryAttack()
             end
 
             self:AnnounceAbility()
+            if not IsValid(self) or not IsValid(ply) or not TBCWeaponMetatable.OngoingFights[self.FightId] then return end
+            timer.Simple(TBC_CAST_DELAY, function()
+                if SMTParticles then SMTParticles.TriggerForWeapon(self, target) end
 
             local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
             if fight then
@@ -218,155 +222,10 @@ function SWEP:PrimaryAttack()
                          "buff", targetEffects)
 
             self:EndAbility()
+            end)
         end
     end
 
     ply:LagCompensation(false)
 end --
 
-function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 1)
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    self:ShootEffects()
-    self:EmitSound(ShootSound)
-    self.Owner:ViewPunch(Angle(-1.5, 0, 0))
-    self.BaseClass.ShootEffects(self)
-
-    if ply:IsPlayer() then
-        local target = ply
-        local dmg = DamageInfo()
-        dmg:SetDamage(0)
-        dmg:SetAttacker(ply)
-        dmg:SetInflictor(self)
-        dmg:SetDamageForce(ply:GetAimVector())
-        dmg:SetDamagePosition(target:GetPos())
-        dmg:SetDamageType(DMG_CLUB)
-        target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                                   ShootEnd)
-
-        if SERVER and IsValid(target) then
-            if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or
-                not TargetCheckValidity(ply, target, true) then
-                ply:LagCompensation(false)
-                return
-            end
-
-            self:AnnounceAbility()
-
-            local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
-            if fight then
-            else
-                return
-            end
-
-            local userBuffsTable = GetAllStats(ply, "buffs")
-            local userDebuffsTable = GetAllStats(ply, "debuffs")
-
-            local targetEffects = {}
-
-            targetEffects["userBuffsTable"] = userBuffsTable
-            targetEffects["userDebuffsTable"] = userDebuffsTable
-
-            local status = HandleStatus(ply, targetEffects["userDebuffsTable"],
-                                        "canUseSkills", true, targetEffects)
-
-            if not status then
-                ply:LagCompensation(false)
-                return
-            end
-
-            local playerSide = (table.HasValue(fight.Side1, ply) and "Side1") or
-                                   (table.HasValue(fight.Side2, ply) and "Side2")
-
-            local enemySide = ""
-
-            if playerSide == "Side1" then
-                enemySide = "Side2"
-            else
-                enemySide = "Side1"
-            end
-
-            local aliveTargets = 0
-            for _, player in ipairs(fight[playerSide]) do
-                if IsValid(player) then
-                    if player:GetNWInt("TBCHP", 100) > 0 then
-                        aliveTargets = aliveTargets + 1
-                    end
-                end
-            end
-
-            if aliveTargets > 1 then
-                ply:ChatPrint(
-                    "You can only use this when there is a single enemy alive.")
-                ply:LagCompensation(false)
-                return
-            end
-
-            local playersInFight = {}
-            for _, player in ipairs(fight[playerSide]) do
-                if IsValid(player) then
-                    if player:GetNWInt("TBCHP", 100) > 0 then
-                        table.insert(playersInFight, player)
-                    end
-                end
-            end
-
-            local debuffsToRemove = Ailments_Statuses["Dekunda"]
-            local lastPlayer = ply
-            for _, player in ipairs(playersInFight) do
-                if IsValid(player) then -- Check if the player is valid
-                    local buffsTable = GetAllStats(player, "buffs")
-                    local debuffsTable = GetAllStats(player, "debuffs")
-
-                    buffsTable["Prisoner_Diamond_Formation"] = {stacks = 1}
-
-                    AssignStat(player, "Prisoner_Diamond_Formation",
-                               buffsTable["Prisoner_Diamond_Formation"], "buffs")
-
-                    targetEffects["buff"] = "Prisoner_Diamond_Formation"
-
-                    HandleStatus(player, buffsTable, "reactionBuff", "buff",
-                                 targetEffects)
-
-                    local message = player:Name() ..
-                                        " is now performing a Prisoner Diamond Formation by order of " ..
-                                        ply:Name()
-
-                    self:AnnounceMessage(message)
-
-                    for _, debuffName in ipairs(debuffsToRemove) do
-                        if debuffsTable[debuffName] then
-                            if debuffsTable[debuffName].stacks >= 2 then
-                                debuffsTable[debuffName] = {stacks = 2}
-                                AssignStat(player, debuffName,
-                                           debuffsTable[debuffName], "debuffs")
-                            end
-                        end
-                    end
-
-                    if ply ~= target then lastPlayer = target end
-                end
-            end
-
-            targetEffects["ply"] = ply
-            targetEffects["target"] = lastPlayer
-
-            HandleStatus(ply, targetEffects["userBuffsTable"], "reactionBuff",
-                         "buff", targetEffects)
-
-            self:EndAbility()
-        end
-    end
-
-    ply:LagCompensation(false)
-end --

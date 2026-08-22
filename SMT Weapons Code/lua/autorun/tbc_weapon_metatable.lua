@@ -10,6 +10,11 @@ include("autorun/client/cl_cza.lua")
 TBCWeaponMetatable = TBCWeaponMetatable or {}
 TBCWeaponMetatable.OngoingFights = TBCWeaponMetatable.OngoingFights or {}
 
+-- Pause between "X used Y!" being announced and the ability's damage/effects
+-- actually resolving, so the cast reads as an RPG-style wind-up instead of
+-- landing instantly.
+TBC_CAST_DELAY = 1.5
+
 local victoryMessageSent = {}
 
 -- Demons don't get their own chat line; their master already receives this
@@ -1036,6 +1041,16 @@ function TBCWeaponMetatable:ClearFightId(player)
         return
     end -- Ensure the player is valid
 
+    -- Tell their client to drop the ally/enemy reticle colors, since the
+    -- periodic TBC_FightSideSync broadcast stops reaching them once they're
+    -- no longer in fight.Side1/Side2.
+    if SERVER and player:IsPlayer() then
+        net.Start("TBC_SyncFightSides")
+        net.WriteUInt(0, 8)
+        net.WriteUInt(0, 8)
+        net.Send(player)
+    end
+
     -- Demon companions store their FightId on the entity itself
     if player.isTBCDemon then
         player.FightId = nil
@@ -1468,7 +1483,7 @@ function TBCWeaponMetatable:EndAbility()
     if not timer.Exists(timerName) then
         timer.Create(
             timerName,
-            1,
+            2,
             1,
             function()
                 local fight = TBCWeaponMetatable.OngoingFights[self.FightId]
@@ -1569,6 +1584,7 @@ if SERVER then
     util.AddNetworkString("PlayBattleMusic")
     util.AddNetworkString("PlayVictoryMusic")
     util.AddNetworkString("PlayEndFightMusic")
+    util.AddNetworkString("TBC_SyncFightSides")
 
     hook.Add(
         "PlayerSwitchWeapon",
@@ -1579,9 +1595,70 @@ if SERVER then
             end
         end
     )
+
+    -- Lets clients color-code the targeting reticle (ally/enemy/neutral)
+    -- without exposing the server-only OngoingFights table to them directly.
+    local function TBC_SendFightSides(fightId, fight, recipients)
+        net.Start("TBC_SyncFightSides")
+        net.WriteUInt(#fight.Side1, 8)
+        for _, member in ipairs(fight.Side1) do
+            net.WriteEntity(member)
+        end
+        net.WriteUInt(#fight.Side2, 8)
+        for _, member in ipairs(fight.Side2) do
+            net.WriteEntity(member)
+        end
+        net.Send(recipients)
+    end
+
+    timer.Create(
+        "TBC_FightSideSync",
+        0.3,
+        0,
+        function()
+            for fightId, fight in pairs(TBCWeaponMetatable.OngoingFights) do
+                local recipients = {}
+                for _, side in ipairs({"Side1", "Side2"}) do
+                    for _, member in ipairs(fight[side]) do
+                        if IsValid(member) and member:IsPlayer() then
+                            table.insert(recipients, member)
+                        end
+                    end
+                end
+
+                if #recipients > 0 then
+                    TBC_SendFightSides(fightId, fight, recipients)
+                end
+            end
+        end
+    )
 end
 
 if CLIENT then
+    -- Fed by TBC_FightSideSync (server); read by cl_target_reticle.lua to
+    -- color the targeting reticle ally/enemy/neutral relative to the local player.
+    TBC_MyFightSides = TBC_MyFightSides or {Side1 = {}, Side2 = {}}
+
+    net.Receive(
+        "TBC_SyncFightSides",
+        function(len)
+            local side1 = {}
+            local count1 = net.ReadUInt(8)
+            for i = 1, count1 do
+                side1[i] = net.ReadEntity()
+            end
+
+            local side2 = {}
+            local count2 = net.ReadUInt(8)
+            for i = 1, count2 do
+                side2[i] = net.ReadEntity()
+            end
+
+            TBC_MyFightSides.Side1 = side1
+            TBC_MyFightSides.Side2 = side2
+        end
+    )
+
     local targetedPlayers = {}
 
     net.Receive(

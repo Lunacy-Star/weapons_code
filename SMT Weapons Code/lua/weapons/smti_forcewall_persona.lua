@@ -52,6 +52,7 @@ SWEP.SlotType = "Equipment"
 SWEP.PersonaSkill = true
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.FallsBackToSelf = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -61,7 +62,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -70,8 +71,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -96,8 +97,8 @@ function SWEP:PrimaryAttack()
     self.Owner:ViewPunch(Angle(-1.5, 0, 0))
     self.BaseClass.ShootEffects(self)
 
-    if tr.Hit and CheckIfValidTBCEntity(tr.Entity) then
-        local target = tr.Entity
+    if true then
+        local target = (tr.Hit and CheckIfValidTBCEntity(tr.Entity)) and tr.Entity or ply
         local dmg = DamageInfo()
         dmg:SetDamage(0)
         dmg:SetAttacker(ply)
@@ -116,6 +117,9 @@ function SWEP:PrimaryAttack()
             end
 
             self:AnnounceAbility()
+            if not IsValid(self) or not IsValid(ply) or not TBCWeaponMetatable.OngoingFights[self.FightId] then return end
+            timer.Simple(TBC_CAST_DELAY, function()
+                if SMTParticles then SMTParticles.TriggerForWeapon(self, target) end
 
             local userBuffsTable = GetAllStats(ply, "buffs")
             local userDebuffsTable = GetAllStats(ply, "debuffs")
@@ -204,138 +208,10 @@ function SWEP:PrimaryAttack()
             self:AnnounceMessage(message)
 
             self:EndAbility()
+            end)
         end
     end
 
     ply:LagCompensation(false)
 end --
 
-function SWEP:SecondaryAttack()
-    self:SetNextSecondaryFire(CurTime() + 1)
-
-    local ply = self:GetOwner()
-
-    ply:LagCompensation(true)
-
-    local ShootPos = ply:GetShootPos()
-    local ShootEnd = ShootPos + ply:GetAimVector() * 250
-
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
-
-    self:ShootEffects()
-    self:EmitSound(ShootSound)
-    self.Owner:ViewPunch(Angle(-1.5, 0, 0))
-    self.BaseClass.ShootEffects(self)
-
-    local target = ply
-    local dmg = DamageInfo()
-    dmg:SetDamage(0)
-    dmg:SetAttacker(ply)
-    dmg:SetInflictor(self)
-    dmg:SetDamageForce(ply:GetAimVector())
-    dmg:SetDamagePosition(target:GetPos())
-    dmg:SetDamageType(DMG_CLUB)
-    target:DispatchTraceAttack(dmg, ShootPos + ply:EyeAngles():Right() * -5,
-                               ShootEnd)
-
-    if SERVER and IsValid(target) then
-        if not PlayerCheckEngageSWEP(ply) or not PlayerCheckFight(ply) or
-            not TargetCheckValidity(ply, target, true) then
-            ply:LagCompensation(false)
-            return
-        end
-
-        self:AnnounceAbility()
-
-        local userBuffsTable = GetAllStats(ply, "buffs")
-        local userDebuffsTable = GetAllStats(ply, "debuffs")
-
-        local targetEffects = {}
-
-        targetEffects["userBuffsTable"] = userBuffsTable
-        targetEffects["userDebuffsTable"] = userDebuffsTable
-
-        local status = HandleStatus(ply, targetEffects["userDebuffsTable"],
-                                    "canUseSkills", true, targetEffects)
-
-        if not status then
-            ply:LagCompensation(false)
-            return
-        end
-
-        local mpCost = self.MPCost -- MP cost of the attack
-        local attackerMP = ply:GetNWInt("TBCMP", 100)
-
-        mpCost = mpCost +
-                     (HandleStatus(ply, userDebuffsTable, "increaseMPCost",
-                                   mpCost) -
-                         HandleStatus(ply, userBuffsTable, "decreaseMPCost",
-                                      mpCost))
-
-        if attackerMP >= mpCost then
-            ply:SetNWInt("TBCMP", attackerMP - mpCost)
-        else
-            ply:ChatPrint("Not enough MP to use this ability.")
-            ply:LagCompensation(false)
-            return
-        end
-
-        local targetBuffsTable = GetAllStats(target, "buffs")
-        local targetDebuffsTable = GetAllStats(target, "debuffs")
-
-        local drain = util.JSONToTable(target:GetNW2String("drain"))
-        local block = util.JSONToTable(target:GetNW2String("block"))
-        local weak = util.JSONToTable(target:GetNW2String("weak"))
-        local resist = util.JSONToTable(target:GetNW2String("resist"))
-        local repel = util.JSONToTable(target:GetNW2String("repel"))
-
-        local message = "... But nothing happened!"
-
-        if targetDebuffsTable["Force_Break"] then
-            RemoveStat(target, "Force_Break", "debuffs")
-            targetDebuffsTable["Force_Break"] = nil
-            message = target:Name() .. "'s Force Break is dispelled!"
-
-        elseif not (table.HasValue(resist, "Force") or
-            (table.HasValue(resist, "Magic") and
-                table.HasValue(Affinities.Magic, "Force")) or
-            (table.HasValue(resist, "Physical") and
-                table.HasValue(Affinities.Physical, "Force")) or
-            table.HasValue(repel, "Force") or
-            (table.HasValue(repel, "Magic") and
-                table.HasValue(Affinities.Magic, "Force")) or
-            (table.HasValue(repel, "Physical") and
-                table.HasValue(Affinities.Physical, "Force")) or
-            table.HasValue(weak, "Force") or
-            (table.HasValue(weak, "Magic") and
-                table.HasValue(Affinities.Magic, "Force")) or
-            (table.HasValue(weak, "Physical") and
-                table.HasValue(Affinities.Physical, "Force")) or
-            table.HasValue(block, "Force") or
-            (table.HasValue(block, "Magic") and
-                table.HasValue(Affinities.Magic, "Force")) or
-            (table.HasValue(block, "Physical") and
-                table.HasValue(Affinities.Physical, "Force")) or
-            table.HasValue(drain, "Force") or
-            (table.HasValue(drain, "Magic") and
-                table.HasValue(Affinities.Magic, "Force")) or
-            (table.HasValue(drain, "Physical") and
-                table.HasValue(Affinities.Physical, "Force"))) then
-
-            targetBuffsTable["Force_Wall"] = {stacks = 1}
-
-            AssignStat(target, "Force_Wall", targetBuffsTable["Force_Wall"],
-                       "buffs")
-
-            message = target:Name() .. " received " .. self.PrintName ..
-                          " from " .. ply:Name() .. "!"
-        end
-
-        self:AnnounceMessage(message)
-
-        self:EndAbility()
-    end
-
-    ply:LagCompensation(false)
-end --

@@ -87,6 +87,7 @@ if SERVER then
             net.WriteTable({})
             net.WriteBool(false)
             net.WriteUInt(0, 16)
+            net.WriteEntity(NULL)
             net.Send(ply)
             return
         end
@@ -98,6 +99,7 @@ if SERVER then
             net.WriteTable({})
             net.WriteBool(false)
             net.WriteUInt(0, 16)
+            net.WriteEntity(NULL)
             net.Send(ply)
             return
         end
@@ -128,11 +130,15 @@ if SERVER then
             turnTime = timer.TimeLeft(engageWeapon.FightId) -- Get the remaining time in seconds
         end -- Exit if the timer doesn't exist
 
+        local currentTurnPlayer = fight.ActiveSide and fight[fight.ActiveSide] and
+                                       fight[fight.ActiveSide][fight.ActiveMember]
+
         net.Start("GetFightInfo")
         net.WriteTable(playersInFight)
         net.WriteTable(enemyInFight)
         net.WriteBool(true)
         net.WriteUInt(turnTime, 16)
+        net.WriteEntity(IsValid(currentTurnPlayer) and currentTurnPlayer or NULL)
         net.Send(ply)
     end)
 end

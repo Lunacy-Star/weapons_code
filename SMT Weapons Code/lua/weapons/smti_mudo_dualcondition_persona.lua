@@ -4,7 +4,7 @@ SWEP.PrintName = "Mudo (Persona)"
 SWEP.Author = "Nara"
 SWEP.Contact = ""
 SWEP.Purpose =
-    "60 dark damage to a single target. If enemy is weak to dark and/or is marked with [Cursed], each condition gives 10% chance to instakill. \n[CHR 6] 12% chance to instakill per condition."
+    "60 dark damage to a single target. The following conditions trigger instakill based on percent value: Marked with Cursed: 3% [CHR 6] Marked with Cursed chance is 4% instead."
 SWEP.Instructions = ""
 SWEP.Category = "Persona Magic Skills"
 
@@ -63,7 +63,7 @@ SWEP.EndAbility = TBCWeaponMetatable.EndAbility
 local ShootSound = Sound("Weapon_357.single")
 
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
@@ -72,8 +72,8 @@ function SWEP:PrimaryAttack()
     local ShootPos = ply:GetShootPos()
     local ShootEnd = ShootPos + ply:GetAimVector() * 250
 
-    local tmin = Vector(1, 1, 1) * -10
-    local tmax = Vector(1, 1, 1) * 10
+    local tmin = Vector(1, 1, 1) * -15
+    local tmax = Vector(1, 1, 1) * 15
 
     local tr = util.TraceHull({
         start = ShootPos,
@@ -118,6 +118,9 @@ function SWEP:PrimaryAttack()
             end
 
             self:AnnounceAbility()
+            if not IsValid(self) or not IsValid(ply) or not TBCWeaponMetatable.OngoingFights[self.FightId] then return end
+            timer.Simple(TBC_CAST_DELAY, function()
+                if SMTParticles then SMTParticles.TriggerForWeapon(self, target) end
 
             local userBuffsTable = GetAllStats(ply, "buffs")
             local userDebuffsTable = GetAllStats(ply, "debuffs")
@@ -200,6 +203,16 @@ function SWEP:PrimaryAttack()
                 self:AnnounceMessage(target:Name() .. " repeled the attack!")
             end
 
+            local playerChr = tonumber(ply:GetNWInt("TBCCHR", 0))
+
+            if targetEffects["targetDebuffsTable"]["Cursed"] then
+                targetEffects["killChance"] = targetEffects["killChance"] + 3
+                if playerChr >= 6 then
+                    targetEffects["killChance"] =
+                        targetEffects["killChance"] + 1
+                end
+            end
+
             targetEffects = HandleCrit(targetEffects["ply"],
                                        targetEffects["target"], targetEffects)
             targetEffects = HandleResistances(targetEffects["ply"],
@@ -208,21 +221,6 @@ function SWEP:PrimaryAttack()
             targetEffects = HandleWeaknesses(targetEffects["ply"],
                                              targetEffects["target"],
                                              targetEffects)
-
-            local playerChr = tonumber(ply:GetNWInt("TBCCHR", 0))
-            local perConditionChance = 10
-            if playerChr >= 6 then perConditionChance = 12 end
-
-            if targetEffects["state"] == "weak" then
-                targetEffects["killChance"] =
-                    targetEffects["killChance"] + perConditionChance
-            end
-
-            if targetEffects["targetDebuffsTable"]["Cursed"] then
-                targetEffects["killChance"] =
-                    targetEffects["killChance"] + perConditionChance
-            end
-
             targetEffects = HandleBlock(targetEffects["ply"],
                                         targetEffects["target"], targetEffects)
             targetEffects = HandleDrain(targetEffects["ply"],
@@ -288,6 +286,7 @@ function SWEP:PrimaryAttack()
             end
 
 
+            end)
         end
     end
 

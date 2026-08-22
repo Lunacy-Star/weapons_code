@@ -50,6 +50,7 @@ SWEP.SlotsTaking = 0
 SWEP.SlotType = "Equipment"
 
 setmetatable(SWEP, TBCWeaponMetatable)
+SWEP.PrimarySelfOnly = true
 SWEP.AnnounceAbility = TBCWeaponMetatable.AnnounceAbility
 SWEP.AnnounceMessage = TBCWeaponMetatable.AnnounceMessage
 SWEP.AbilityRollNumber = TBCWeaponMetatable.AbilityRollNumber
@@ -61,7 +62,7 @@ local ShootSound = Sound("Weapon_357.single")
 -- Self-only: applies Guard to the owner. Mirrors the /guard chat command in
 -- tbc_commands.lua (TBCGuard hook) — keep both in sync if either changes.
 function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 1)
+    self:SetNextPrimaryFire(CurTime() + TBC_CAST_DELAY)
 
     local ply = self:GetOwner()
 
